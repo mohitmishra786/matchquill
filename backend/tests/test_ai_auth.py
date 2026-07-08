@@ -3,7 +3,7 @@ Tests for AI Router with Authentication
 """
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, patch
 import jwt
 from datetime import datetime, timedelta
 

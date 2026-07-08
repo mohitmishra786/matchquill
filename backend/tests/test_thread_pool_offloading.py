@@ -3,7 +3,6 @@ Tests for Thread Pool Executor Usage
 Verify that CPU-intensive tasks are offloaded from the event loop.
 """
 
-import pytest
 import asyncio
 import threading
 from unittest.mock import patch, MagicMock
@@ -40,9 +39,6 @@ class TestThreadPoolOffloading:
         main_thread_id = threading.current_thread().ident
         pdf_thread_id = None
         
-        # Mock the sync PDF generation to capture thread ID
-        original_generate = pdf_generator.PDFGenerator._generate_pdf_sync
-        
         def mock_generate_sync(self, html_content, max_pages=1):
             nonlocal pdf_thread_id
             pdf_thread_id = threading.current_thread().ident
@@ -50,8 +46,7 @@ class TestThreadPoolOffloading:
             return b"%PDF-1.4 mock pdf"
         
         with patch.object(pdf_generator.PDFGenerator, '_generate_pdf_sync', mock_generate_sync):
-            with patch.object(pdf_generator, 'HTML') as mock_html, \
-                 patch.object(pdf_generator, 'CSS') as mock_css:
+            with patch.object(pdf_generator, 'HTML') as mock_html:
                 # Set up mocks to avoid actual WeasyPrint calls
                 mock_doc = MagicMock()
                 mock_doc.pages = [MagicMock()]
@@ -73,7 +68,7 @@ class TestThreadPoolOffloading:
                     result = await generator.generate_pdf(resume)
                     return result
                 
-                result = asyncio.run(test_generation())
+                asyncio.run(test_generation())
         
         # Verify PDF was generated in a different thread
         assert pdf_thread_id is not None
@@ -90,8 +85,6 @@ class TestThreadPoolOffloading:
         concurrent_count = 0
         max_concurrent = 0
         lock = threading.Lock()
-        
-        original_generate = pdf_generator.PDFGenerator._generate_pdf_sync
         
         def mock_generate_sync(self, html_content, max_pages=1):
             nonlocal concurrent_count, max_concurrent
@@ -110,12 +103,11 @@ class TestThreadPoolOffloading:
             return b"%PDF-1.4 mock pdf"
         
         with patch.object(pdf_generator.PDFGenerator, '_generate_pdf_sync', mock_generate_sync):
-            with patch.object(pdf_generator, 'HTML') as mock_html, \
-                 patch.object(pdf_generator, 'CSS') as mock_css:
+            with patch.object(pdf_generator, 'HTML') as mock_html:
                 mock_doc = MagicMock()
                 mock_doc.pages = [MagicMock()]
                 mock_html.return_value.render.return_value = mock_doc
-                
+    
                 async def test_concurrent():
                     generator = pdf_generator.PDFGenerator()
                     
@@ -153,7 +145,7 @@ class TestThreadPoolOffloading:
         executor1 = get_pdf_executor()
         
         # Create a new PDFGenerator
-        gen1 = PDFGenerator()
+        PDFGenerator()
         
         # Get executor again
         executor2 = get_pdf_executor()

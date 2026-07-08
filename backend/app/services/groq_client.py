@@ -6,7 +6,6 @@ Wrapper for the Groq API for generating cover letters.
 import time
 import json
 from typing import Optional, List, Dict, Any
-from functools import partial
 from groq import AsyncGroq
 
 from app.config import get_settings

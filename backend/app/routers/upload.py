@@ -16,7 +16,7 @@ from typing import Optional
 from app.services.resume_parser import resume_parser
 from app.utils.logger import logger, get_request_id
 from app.middleware.auth import verify_auth_token
-from app.utils.rate_limiter import limiter, RateLimitConfig
+from app.utils.rate_limiter import limiter
 
 
 # Semaphore to limit concurrent parsing operations (prevents resource exhaustion)

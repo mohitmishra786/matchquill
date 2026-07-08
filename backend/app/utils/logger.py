@@ -18,6 +18,14 @@ request_id_var: ContextVar[str] = ContextVar('request_id', default='')
 user_id_var: ContextVar[str] = ContextVar('user_id', default='')
 session_id_var: ContextVar[str] = ContextVar('session_id', default='')
 
+# Standard set of sensitive keys to mask in logs
+DEFAULT_SENSITIVE_KEYS: set = {
+    "password", "passwd", "secret", "token", "api_key", "apikey",
+    "access_token", "refresh_token", "auth_token", "authorization",
+    "jwt", "key", "private_key", "secret_key", "credentials",
+    "session_id", "csrf_token", "otp", "pin", "ssn",
+}
+
 
 class StructuredFormatter(logging.Formatter):
     """Format logs as structured JSON for easy parsing in Vercel/Railway"""

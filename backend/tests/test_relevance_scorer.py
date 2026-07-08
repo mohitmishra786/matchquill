@@ -234,7 +234,7 @@ def test_scorer_cache_stats():
 
     # Create some scorers
     scorer1 = RelevanceScorer("Python Developer")
-    scorer2 = RelevanceScorer("Java Developer")
+    scorer2 = RelevanceScorer("Java Developer")  # noqa: F841
     scorer3 = RelevanceScorer("Python Developer")  # Same as scorer1
 
     # Check stats

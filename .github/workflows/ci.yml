@@ -66,7 +66,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.9.0'
+        node-version: '22'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
 
@@ -79,25 +79,25 @@ jobs:
     - name: Build
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       run: npm run build
 
-    # Frontend tests seem to be using vitest, let's run them if they exist
     - name: Run Tests
       run: npm run test
 
   extension-test:
     name: Extension (Tests)
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.9.0'
+        node-version: '22'
         cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+        cache-dependency-path: extension/package-lock.json
 
     - name: Install Extension dependencies
       working-directory: ./extension

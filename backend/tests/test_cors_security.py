@@ -1,11 +1,7 @@
 """
 Tests for CORS Configuration
 """
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch
 
-from app.main import app
 from app.config import get_settings
 
 

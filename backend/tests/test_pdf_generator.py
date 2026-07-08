@@ -172,7 +172,6 @@ def test_preview_html(generator):
 @pytest.mark.asyncio
 async def test_generate_pdf_runs_in_thread_pool(generator):
     """Test that PDF generation uses thread pool executor."""
-    from concurrent.futures import ThreadPoolExecutor
     
     mock_document = MagicMock()
     mock_document.pages = [MagicMock()]

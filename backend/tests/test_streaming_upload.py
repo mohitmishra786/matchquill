@@ -6,9 +6,8 @@ Tests for memory-efficient file upload processing with streaming and temp files.
 import pytest
 import tempfile
 import os
-from pathlib import Path
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import jwt
 from datetime import datetime, timedelta
 
@@ -102,9 +101,6 @@ class TestStreamingUpload:
     
     def test_concurrent_upload_limit(self, client, valid_token):
         """Test that concurrent uploads are limited by semaphore."""
-        # Create test content
-        test_content = b"%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n%%EOF"
-        
         # Create a slow parser to test semaphore
         async def slow_parse(*args, **kwargs):
             import asyncio
@@ -117,7 +113,6 @@ class TestStreamingUpload:
             }
         
         with patch("app.services.resume_parser.ResumeParser.parse_file", side_effect=slow_parse):
-            import asyncio
             
             async def make_upload(client, token, content):
                 """Make a single upload request."""

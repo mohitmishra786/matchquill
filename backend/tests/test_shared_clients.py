@@ -16,7 +16,7 @@ class TestSharedGroqClient:
             mock_config.groq_api_key = "test_key"
             mock_settings.return_value = mock_config
             
-            from app.services.resume_parser import get_groq_client, _groq_client
+            from app.services.resume_parser import get_groq_client
             
             # Reset module-level client
             import app.services.resume_parser
@@ -52,7 +52,7 @@ class TestSharedHTTPClient:
     
     def test_get_shared_http_client_creates_singleton(self):
         """Test that get_shared_http_client returns the same instance."""
-        from app.services.profile_service import get_shared_http_client, _http_client
+        from app.services.profile_service import get_shared_http_client
         
         # Reset module-level client
         import app.services.profile_service
@@ -70,7 +70,7 @@ class TestSharedHTTPClient:
     @pytest.mark.asyncio
     async def test_close_shared_http_client(self):
         """Test that close_shared_http_client properly closes the client."""
-        from app.services.profile_service import get_shared_http_client, close_shared_http_client, _http_client
+        from app.services.profile_service import get_shared_http_client, close_shared_http_client
         
         # Reset module-level client
         import app.services.profile_service
