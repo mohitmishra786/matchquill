@@ -20,9 +20,9 @@ session_id_var: ContextVar[str] = ContextVar('session_id', default='')
 
 # Standard set of sensitive keys to mask in logs
 DEFAULT_SENSITIVE_KEYS: set = {
-    "password", "passwd", "secret", "token", "api_key", "apikey",
+    "password", "passwd", "secret", "token", "api_key", "apikey", "api-key",
     "access_token", "refresh_token", "auth_token", "authorization",
-    "jwt", "key", "private_key", "secret_key", "credentials",
+    "jwt", "key", "private_key", "secret_key",
     "session_id", "csrf_token", "otp", "pin", "ssn",
 }
 
