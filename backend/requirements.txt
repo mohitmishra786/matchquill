@@ -19,7 +19,7 @@ slowapi==0.1.9
 # Resume parsing
 PyMuPDF==1.26.5
 python-docx==1.1.2
-python-multipart==0.0.20
+python-multipart==0.0.31
 psutil==6.1.1
 sentry-sdk[fastapi]==2.64.0
 ruff==0.1.9
