@@ -20,7 +20,7 @@ updates:
           - "minor"
           - "patch"
       major-updates:
-        dependency-type: "production"
+        dependency-type: ["production", "development"]
         update-types:
           - "major"
         patterns:
@@ -54,7 +54,7 @@ updates:
           - "minor"
           - "patch"
       major-updates:
-        dependency-type: "production"
+        dependency-type: ["production", "development"]
         update-types:
           - "major"
         patterns:
@@ -75,7 +75,7 @@ updates:
           - "minor"
           - "patch"
       major-updates:
-        dependency-type: "production"
+        dependency-type: ["production", "development"]
         update-types:
           - "major"
         patterns:

@@ -133,7 +133,7 @@ class ResumeParser:
     @log_function_call
     async def parse_file(
         self, 
-        file_input: bytes | str, 
+        file_input, 
         filename: str, 
         file_type: str = "resume",
         is_file_path: bool = False
