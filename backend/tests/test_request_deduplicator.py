@@ -85,12 +85,15 @@ async def test_deduplicator_exception_handling(deduplicator):
         raise ValueError("Operation failed")
 
     # Launch multiple requests
-    with pytest.raises(ValueError, match="Operation failed"):
-        await asyncio.gather(
-            deduplicator.execute("test", failing_operation),
-            deduplicator.execute("test", failing_operation),
-            return_exceptions=False
-        )
+    results = await asyncio.gather(
+        deduplicator.execute("test", failing_operation),
+        deduplicator.execute("test", failing_operation),
+        return_exceptions=True
+    )
+
+    # Both should have raised ValueError
+    assert all(isinstance(r, ValueError) for r in results)
+    assert all(str(r) == "Operation failed" for r in results)
 
 
 @pytest.mark.asyncio
@@ -165,18 +168,18 @@ async def test_cleanup_expired_method(deduplicator):
     """Test the cleanup_expired method."""
 
     # Manually insert an expired request
-    expired_future = asyncio.get_running_loop().create_future()
+    expired_event = asyncio.Event()
     expired_request = InFlightRequest(
-        future=expired_future,
+        event=expired_event,
         timestamp=datetime.utcnow() - timedelta(seconds=10),
         request_hash="expired_hash"
     )
     deduplicator._in_flight["expired_key"] = expired_request
 
     # Insert a non-expired request
-    valid_future = asyncio.get_running_loop().create_future()
+    valid_event = asyncio.Event()
     valid_request = InFlightRequest(
-        future=valid_future,
+        event=valid_event,
         timestamp=datetime.utcnow(),
         request_hash="valid_hash"
     )
@@ -188,10 +191,6 @@ async def test_cleanup_expired_method(deduplicator):
     assert removed_count == 1
     assert "expired_key" not in deduplicator._in_flight
     assert "valid_key" in deduplicator._in_flight
-
-    # Clean up the valid future
-    if not valid_future.done():
-        valid_future.set_result(None)
 
 
 @pytest.mark.asyncio
