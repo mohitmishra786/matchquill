@@ -6,9 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
-import { isValidEmail } from '@/lib/utils';
 import { createRequestLogger, getOrCreateRequestId, logDbOperation, logAuthOperation } from '@/lib/logger';
 import { isRateLimited, getClientIP, rateLimits, validateBotProtection } from '@/lib/rate-limit';
+import { parseRegistrationInput, parseHoneypot, ValidationError } from '@/lib/input-validation';
 
 function sanitizeError(error: unknown): { message: string; code: string } {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -54,9 +54,8 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { email, password, name, honeypot } = body;
 
-        if (!validateBotProtection(honeypot)) {
+        if (!validateBotProtection(parseHoneypot(body))) {
             logger.warn('Registration blocked - bot detected via honeypot', { clientIP });
             return NextResponse.json(
                 { error: 'Registration is temporarily unavailable', requestId },
@@ -64,37 +63,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const { email, password, name } = parseRegistrationInput(body);
+
         logger.info('Registration attempt', {
-            email: email ? `${email.substring(0, 3)}***` : undefined,
-            hasPassword: !!password,
+            email: `${email.substring(0, 3)}***`,
+            hasPassword: true,
             hasName: !!name
         });
-
-        if (!email || !password) {
-            logger.warn('Registration failed: missing required fields', { hasEmail: !!email, hasPassword: !!password });
-            return NextResponse.json(
-                { error: 'Email and password are required', requestId },
-                { status: 400 }
-            );
-        }
-
-        // Validate email format
-        if (!isValidEmail(email)) {
-            logger.warn('Registration failed: invalid email format');
-            return NextResponse.json(
-                { error: 'Invalid email format', requestId },
-                { status: 400 }
-            );
-        }
-
-        // Validate password strength
-        if (password.length < 8) {
-            logger.warn('Registration failed: password too short');
-            return NextResponse.json(
-                { error: 'Password must be at least 8 characters', requestId },
-                { status: 400 }
-            );
-        }
 
         // Check database connection
         logger.info('Checking database connection...');
@@ -104,7 +79,7 @@ export async function POST(request: NextRequest) {
         let existingUser;
         try {
             existingUser = await prisma.user.findUnique({
-                where: { email },
+                where: { email: email },
             });
         } catch (dbError) {
             logger.error('Database error during user lookup', {
@@ -136,7 +111,7 @@ export async function POST(request: NextRequest) {
         try {
             user = await prisma.user.create({
                 data: {
-                    email,
+                    email: email,
                     passwordHash,
                     name: name || null,
                 },
@@ -187,6 +162,14 @@ export async function POST(request: NextRequest) {
             { status: 201 }
         );
     } catch (error) {
+        if (error instanceof ValidationError) {
+            logger.warn('Registration validation failed', { error: error.message });
+            return NextResponse.json(
+                { error: error.message, requestId },
+                { status: 400 }
+            );
+        }
+
         logger.failOperation('user:register', error);
 
         const sanitized = sanitizeError(error);

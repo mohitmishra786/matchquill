@@ -45,7 +45,11 @@ export async function POST(request: NextRequest) {
         // Sanitize username before using in URL
         const sanitizedUsername = sanitizeGitHubUsername(username);
 
-        const res = await fetch(`https://api.github.com/users/${sanitizedUsername}/repos?sort=updated&per_page=10`, {
+        const githubUrl = new URL(`https://api.github.com/users/${encodeURIComponent(sanitizedUsername)}/repos?sort=updated&per_page=10`);
+        if (githubUrl.origin !== 'https://api.github.com') {
+            return NextResponse.json({ error: 'Invalid GitHub URL' }, { status: 400 });
+        }
+        const res = await fetch(githubUrl.toString(), {
             headers: {
                 'Accept': 'application/vnd.github.v3+json',
                 'User-Agent': 'CV-Wiz-App'

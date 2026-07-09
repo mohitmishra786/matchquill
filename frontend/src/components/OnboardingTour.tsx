@@ -101,7 +101,6 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
                 popover: {
                     title: 'You\'re All Set! 🎉',
                     description: 'You\'re ready to build amazing resumes and ace your interviews. Need help? Press "?" anytime for keyboard shortcuts.',
-                    side: "over",
                     align: 'center'
                 }
             }
