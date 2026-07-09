@@ -110,11 +110,11 @@
     function detectJobBoard() {
         const hostname = window.location.hostname;
 
-        if (hostname.includes('linkedin.com')) return 'linkedin';
-        if (hostname.includes('indeed.com')) return 'indeed';
-        if (hostname.includes('glassdoor.com')) return 'glassdoor';
-        if (hostname.includes('greenhouse.io')) return 'greenhouse';
-        if (hostname.includes('lever.co')) return 'lever';
+        if (hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com')) return 'linkedin';
+        if (hostname === 'indeed.com' || hostname.endsWith('.indeed.com')) return 'indeed';
+        if (hostname === 'glassdoor.com' || hostname.endsWith('.glassdoor.com')) return 'glassdoor';
+        if (hostname === 'greenhouse.io' || hostname.endsWith('.greenhouse.io')) return 'greenhouse';
+        if (hostname === 'lever.co' || hostname.endsWith('.lever.co')) return 'lever';
 
         return 'generic';
     }

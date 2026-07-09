@@ -403,7 +403,7 @@ export function useArrowKeyNavigation(
     const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
         if (itemCount === 0) return;
 
-        let newIndex = activeIndex;
+        let newIndex: number;
 
         switch (event.key) {
             case orientation === 'vertical' ? 'ArrowDown' : 'ArrowRight':
