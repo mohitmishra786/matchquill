@@ -1,6 +1,11 @@
 function isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    const atIndex = email.indexOf('@');
+    if (atIndex < 1) return false;
+    const lastDotIndex = email.lastIndexOf('.');
+    if (lastDotIndex < atIndex + 2) return false;
+    if (lastDotIndex >= email.length - 2) return false;
+    if (email.indexOf(' ') !== -1) return false;
+    return true;
 }
 
 export class ValidationError extends Error {
