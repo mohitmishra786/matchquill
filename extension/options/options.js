@@ -70,11 +70,22 @@ async function loadConfig() {
  * Update configuration display
  */
 function updateConfigDisplay(environment, apiUrl, frontendUrl) {
-    elements.configDisplay.innerHTML = `
-        <p><span class="label">Environment:</span> <span class="value">${environment}</span></p>
-        <p><span class="label">API Base URL:</span> <span class="value">${apiUrl || 'Not set'}</span></p>
-        <p><span class="label">Frontend URL:</span> <span class="value">${frontendUrl || 'Not set'}</span></p>
-    `;
+    elements.configDisplay.textContent = '';
+    const p1 = document.createElement('p');
+    p1.innerHTML = `<span class="label">Environment:</span> <span class="value">${escapeHtml(environment)}</span>`;
+    const p2 = document.createElement('p');
+    p2.innerHTML = `<span class="label">API Base URL:</span> <span class="value">${escapeHtml(apiUrl || 'Not set')}</span>`;
+    const p3 = document.createElement('p');
+    p3.innerHTML = `<span class="label">Frontend URL:</span> <span class="value">${escapeHtml(frontendUrl || 'Not set')}</span>`;
+    elements.configDisplay.appendChild(p1);
+    elements.configDisplay.appendChild(p2);
+    elements.configDisplay.appendChild(p3);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 /**

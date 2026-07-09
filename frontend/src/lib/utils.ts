@@ -56,8 +56,9 @@ export function truncate(text: string, length: number): string {
  * Validate email format
  */
 export function isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    const atIndex = email.indexOf('@');
+    const dotIndex = email.lastIndexOf('.');
+    return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < email.length - 1;
 }
 
 /**

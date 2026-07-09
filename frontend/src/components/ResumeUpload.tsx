@@ -244,7 +244,7 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
                         ? 'border-indigo-500 bg-indigo-50'
                         : success
                             ? 'border-green-300 bg-green-50'
-                            : error && !success
+                            : error
                                 ? 'border-red-300 bg-red-50'
                                 : 'border-gray-300 hover:border-gray-400'
                     }

@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
             hasName: !!name
         });
 
-        if (!email || !password) {
-            logger.warn('Registration failed: missing required fields', { hasEmail: !!email, hasPassword: !!password });
+        if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+            logger.warn('Registration failed: missing required fields', { hasEmail: typeof email === 'string', hasPassword: typeof password === 'string' });
             return NextResponse.json(
                 { error: 'Email and password are required', requestId },
                 { status: 400 }
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Validate password strength
-        if (password.length < 8) {
+        if (typeof password !== 'string' || password.length < 8) {
             logger.warn('Registration failed: password too short');
             return NextResponse.json(
                 { error: 'Password must be at least 8 characters', requestId },
