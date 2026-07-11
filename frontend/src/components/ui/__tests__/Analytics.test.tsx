@@ -4,8 +4,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { render, screen, waitFor } from '@testing-library/react';
 
 // Mock fetch
 const mockFetch = vi.fn();

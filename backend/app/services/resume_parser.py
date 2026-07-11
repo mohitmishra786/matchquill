@@ -669,8 +669,12 @@ Return ONLY JSON, no markdown or explanation."""
         # If no specific hints, extract everything
         if not sections_to_extract:
             sections_to_extract = ['name', 'email', 'phone', 'summary', 'experiences', 'education', 'skills', 'projects']
+
+        # sections_to_extract guides which fields we emphasize in the prompt
+        sections_csv = ", ".join(sections_to_extract)
         
         prompt = f"""You are an expert resume parser. Extract ALL information from this resume section thoroughly.
+Focus especially on these sections when present: {sections_csv}.
 DO NOT miss any projects, experiences, skills, or contact information. Be exhaustive in your extraction.
 
 CRITICAL EXTRACTION RULES:

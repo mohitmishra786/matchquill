@@ -1,11 +1,5 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-# ESLint is a tool for identifying and reporting on patterns
-# found in ECMAScript/JavaScript code.
-# More details at https://github.com/eslint/eslint
-# and https://eslint.org
+# ESLint SARIF scan for the Next.js frontend (flat config / ESLint 9).
+# Results upload to GitHub Code Scanning.
 
 name: ESLint
 
@@ -13,7 +7,6 @@ on:
   push:
     branches: [ "main" ]
   pull_request:
-    # The branches below must be a subset of the branches above
     branches: [ "main" ]
   schedule:
     - cron: '42 22 * * 0'
@@ -25,28 +18,51 @@ jobs:
     permissions:
       contents: read
       security-events: write
-      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+      actions: read
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Install ESLint
-        run: |
-          npm install eslint@8.10.0
-          npm install @microsoft/eslint-formatter-sarif@3.1.0
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install SARIF formatter
+        run: npm install --no-save @microsoft/eslint-formatter-sarif@3.1.0
 
       - name: Run ESLint
         env:
           SARIF_ESLINT_IGNORE_SUPPRESSED: "true"
-        run: npx eslint .
-          --config .eslintrc.js
-          --ext .js,.jsx,.ts,.tsx
-          --format @microsoft/eslint-formatter-sarif
-          --output-file eslint-results.sarif
-        continue-on-error: true
+        run: |
+          set +e
+          npx eslint . \
+            --format @microsoft/eslint-formatter-sarif \
+            --output-file "${GITHUB_WORKSPACE}/eslint-results.sarif"
+          status=$?
+          set -e
+          # Crash before write (missing config, etc.) must not fail upload
+          if [ ! -f "${GITHUB_WORKSPACE}/eslint-results.sarif" ]; then
+            printf '%s\n' '{"version":"2.1.0","$schema":"https://json.schemastore.org/sarif-2.1.0.json","runs":[]}' \
+              > "${GITHUB_WORKSPACE}/eslint-results.sarif"
+          fi
+          # Lint findings are reported via SARIF; only hard crashes (exit 2) fail the job
+          if [ "$status" -ge 2 ]; then
+            echo "ESLint crashed with exit code $status"
+            exit "$status"
+          fi
+          exit 0
 
       - name: Upload analysis results to GitHub
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: eslint-results.sarif
           wait-for-processing: true

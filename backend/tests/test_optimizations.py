@@ -11,33 +11,31 @@ class TestSharedFontConfiguration:
     
     def test_get_shared_font_configuration_singleton(self):
         """Test that get_shared_font_configuration returns the same instance."""
-        from app.utils.pdf_generator import get_shared_font_configuration
+        import app.utils.pdf_generator as pdf_gen
         
         # Reset module-level font config
-        import app.utils.pdf_generator
-        app.utils.pdf_generator._font_configuration = None
+        pdf_gen._font_configuration = None
         
         # First call creates FontConfiguration
-        font_config1 = get_shared_font_configuration()
+        font_config1 = pdf_gen.get_shared_font_configuration()
         assert font_config1 is not None
         
         # Second call returns same instance
-        font_config2 = get_shared_font_configuration()
+        font_config2 = pdf_gen.get_shared_font_configuration()
         assert font_config1 is font_config2
     
     def test_pdf_generator_uses_shared_font_config(self):
         """Test that PDFGenerator uses shared FontConfiguration."""
-        from app.utils.pdf_generator import PDFGenerator, get_shared_font_configuration
+        import app.utils.pdf_generator as pdf_gen
         
         # Reset module-level font config
-        import app.utils.pdf_generator
-        app.utils.pdf_generator._font_configuration = None
+        pdf_gen._font_configuration = None
         
         # Create PDFGenerator instance
-        generator = PDFGenerator()
+        generator = pdf_gen.PDFGenerator()
         
         # Verify it uses shared font config
-        shared_config = get_shared_font_configuration()
+        shared_config = pdf_gen.get_shared_font_configuration()
         assert generator.font_config is shared_config
 
 

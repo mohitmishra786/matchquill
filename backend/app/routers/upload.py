@@ -183,12 +183,11 @@ async def upload_resume(
 
             # Stream file to temporary file instead of reading all into memory
             # This prevents OOM for large files and allows memory-efficient processing
-            temp_file = None
             temp_path = None  # Initialize for finally block
             try:
                 # Create a temporary file
-                with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename or "upload").suffix) as temp_file:
-                    temp_path = temp_file.name
+                with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename or "upload").suffix) as tmp:
+                    temp_path = tmp.name
                     file_size = 0
                     chunk_size = 8192  # 8KB chunks
                     
@@ -216,7 +215,7 @@ async def upload_resume(
                                 detail=f"File too large ({file_size // 1024 // 1024}MB). Maximum size is {MAX_FILE_SIZE // 1024 // 1024}MB",
                             )
                         
-                        temp_file.write(chunk)
+                        tmp.write(chunk)
                 
                 logger.info("[Upload] File streamed successfully", {
                     "request_id": request_id,

@@ -1,26 +1,19 @@
 # Dependency Review Action
 #
-# This Action will scan dependency manifest files that change as part of a Pull Request,
-# surfacing known-vulnerable versions of the packages declared or updated in the PR.
-# Once installed, if the workflow run is marked as required, PRs introducing known-vulnerable
-# packages will be blocked from merging.
+# Scans PR dependency manifest changes (package-lock.json, requirements, etc.)
+# for known vulnerabilities. Uses lockfile/manifest diffs — no dependency
+# snapshot submission is required for this monorepo.
 #
-# Source repository: https://github.com/actions/dependency-review-action
-# Public documentation: https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review#dependency-review-enforcement
+# Source: https://github.com/actions/dependency-review-action
+# Docs: https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review
+
 name: 'Dependency review'
 on:
   pull_request:
     branches: [ "main" ]
 
-# If using a dependency submission action in this workflow this permission will need to be set to:
-#
-# permissions:
-#   contents: write
-#
-# https://docs.github.com/en/enterprise-cloud@latest/code-security/supply-chain-security/understanding-your-software-supply-chain/using-the-dependency-submission-api
 permissions:
   contents: read
-  # Write permissions for pull-requests are required for using the `comment-summary-in-pr` option, comment out if you aren't using this option
   pull-requests: write
 
 jobs:
@@ -28,12 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout repository'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+
       - name: 'Dependency Review'
-        uses: actions/dependency-review-action@v4
-        # Commonly enabled options, see https://github.com/actions/dependency-review-action#configuration-options for all available options.
+        # v5 runs on Node 24 (avoids Node 20 deprecation warnings)
+        uses: actions/dependency-review-action@v5
         with:
           comment-summary-in-pr: always
-        #   fail-on-severity: moderate
-        #   deny-licenses: GPL-1.0-or-later, LGPL-2.0-or-later
-        #   retry-on-snapshot-warnings: true
+          # Do NOT enable retry-on-snapshot-warnings: we do not run a
+          # dependency-submission job on PR heads, so retries only wait ~2min
+          # for snapshots that never arrive ("No snapshots were found for the head SHA").
+          retry-on-snapshot-warnings: false
