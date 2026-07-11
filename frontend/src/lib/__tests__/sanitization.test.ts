@@ -69,11 +69,12 @@ describe('sanitizeRichText', () => {
         expect(result).not.toContain('onclick');
     });
 
-    it('should use isomorphic-dompurify consistently (no raw script leakage)', () => {
+    it('should strip event handlers without leaving raw script leakage', () => {
         const dirty = '<img src=x onerror=alert(1)><b>ok</b>';
         const result = sanitizeRichText(dirty);
         expect(result).toContain('<b>ok</b>');
         expect(result).not.toContain('onerror');
+        expect(result).not.toContain('<img');
     });
 
     it('should handle null and undefined', () => {

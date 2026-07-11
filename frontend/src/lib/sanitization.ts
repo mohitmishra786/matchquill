@@ -1,17 +1,17 @@
 /**
  * Input Sanitization Utilities
  * Provides XSS protection and input sanitization for user-generated content.
- * Uses isomorphic-dompurify for consistent client/server HTML sanitization.
+ *
+ * Pure JavaScript implementation — no jsdom / isomorphic-dompurify.
+ * (jsdom breaks Next.js page-data collection with missing default-stylesheet.css)
  */
-
-import DOMPurify from 'isomorphic-dompurify';
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
 /** Tags allowed in rich-text fields (descriptions, cover letters, etc.) */
-const RICH_TEXT_ALLOWED_TAGS = [
+const RICH_TEXT_ALLOWED_TAGS = new Set([
     'b',
     'i',
     'em',
@@ -31,9 +31,107 @@ const RICH_TEXT_ALLOWED_TAGS = [
     'blockquote',
     'code',
     'pre',
-];
+]);
 
-const RICH_TEXT_ALLOWED_ATTR = ['href', 'target', 'rel', 'class'];
+const VOID_TAGS = new Set(['br']);
+
+// ============================================================================
+// Pure HTML helpers (no DOM)
+// ============================================================================
+
+function decodeBasicEntities(input: string): string {
+    return input
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#0*39;/g, "'")
+        .replace(/&#x27;/gi, "'");
+}
+
+/**
+ * Strip all HTML tags and dangerous content. Pure string processing.
+ */
+function stripAllTags(html: string): string {
+    let s = html;
+    // Remove comments, scripts, styles entirely (including content)
+    s = s.replace(/<!--[\s\S]*?-->/g, '');
+    s = s.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+    s = s.replace(/<style\b[\s\S]*?<\/style>/gi, '');
+    s = s.replace(/<iframe\b[\s\S]*?<\/iframe>/gi, '');
+    s = s.replace(/<object\b[\s\S]*?<\/object>/gi, '');
+    s = s.replace(/<embed\b[^>]*>/gi, '');
+    s = s.replace(/<svg\b[\s\S]*?<\/svg>/gi, '');
+    // Remove remaining tags
+    s = s.replace(/<\/?[^>]+>/g, '');
+    return decodeBasicEntities(s);
+}
+
+function isSafeHref(href: string): boolean {
+    const trimmed = href.trim();
+    const lower = trimmed.toLowerCase();
+    if (
+        lower.startsWith('javascript:') ||
+        lower.startsWith('data:') ||
+        lower.startsWith('vbscript:') ||
+        lower.startsWith('file:')
+    ) {
+        return false;
+    }
+    return /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(trimmed) || trimmed.startsWith('/');
+}
+
+/**
+ * Allow only safe tags; strip event handlers and dangerous attributes.
+ */
+function sanitizeRichHtml(html: string): string {
+    let s = html;
+    s = s.replace(/<!--[\s\S]*?-->/g, '');
+    s = s.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+    s = s.replace(/<style\b[\s\S]*?<\/style>/gi, '');
+    s = s.replace(/<iframe\b[\s\S]*?<\/iframe>/gi, '');
+    s = s.replace(/<object\b[\s\S]*?<\/object>/gi, '');
+    s = s.replace(/<embed\b[^>]*>/gi, '');
+    s = s.replace(/<svg\b[\s\S]*?<\/svg>/gi, '');
+
+    // Process tags
+    s = s.replace(/<\/?([a-zA-Z0-9]+)(\s[^>]*)?>/g, (match, rawTag: string, attrs?: string) => {
+        const isClosing = match.startsWith('</');
+        const tag = rawTag.toLowerCase();
+
+        if (!RICH_TEXT_ALLOWED_TAGS.has(tag)) {
+            return '';
+        }
+
+        if (isClosing) {
+            if (VOID_TAGS.has(tag)) return '';
+            return `</${tag}>`;
+        }
+
+        if (VOID_TAGS.has(tag)) {
+            return `<${tag}>`;
+        }
+
+        // Only anchors may keep attributes (safe href only)
+        if (tag === 'a' && attrs) {
+            const hrefMatch = attrs.match(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+            const href = hrefMatch
+                ? (hrefMatch[1] ?? hrefMatch[2] ?? hrefMatch[3] ?? '').trim()
+                : '';
+            if (href && isSafeHref(href)) {
+                // Force safe rel/target
+                return `<a href="${href.replace(/"/g, '&quot;')}" rel="noopener noreferrer">`;
+            }
+            return '<a>';
+        }
+
+        // All other allowed tags: no attributes (drops onclick, style, etc.)
+        return `<${tag}>`;
+    });
+
+    return s.trim();
+}
 
 // ============================================================================
 // Sanitization Functions
@@ -45,10 +143,7 @@ const RICH_TEXT_ALLOWED_ATTR = ['href', 'target', 'rel', 'class'];
  */
 export function sanitizeText(input: unknown): string {
     if (typeof input !== 'string' || !input) return '';
-    const cleaned = DOMPurify.sanitize(input, {
-        ALLOWED_TAGS: [],
-        ALLOWED_ATTR: [],
-    });
+    const cleaned = stripAllTags(input);
     return cleaned.trim().replace(/\s+/g, ' ');
 }
 
@@ -58,11 +153,7 @@ export function sanitizeText(input: unknown): string {
  */
 export function sanitizeRichText(input: unknown): string {
     if (typeof input !== 'string' || !input) return '';
-    return DOMPurify.sanitize(input, {
-        ALLOWED_TAGS: RICH_TEXT_ALLOWED_TAGS,
-        ALLOWED_ATTR: RICH_TEXT_ALLOWED_ATTR,
-        ALLOW_DATA_ATTR: false,
-    }).trim();
+    return sanitizeRichHtml(input).trim();
 }
 
 /**
