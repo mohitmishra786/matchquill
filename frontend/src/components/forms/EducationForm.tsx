@@ -40,7 +40,7 @@ export default function EducationForm({ education, onSubmit, onCancel }: Educati
         gpa: education?.gpa?.toString() || '',
         honors: education?.honors?.join('\n') || '',
     });
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState<boolean>(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     logger.debug('[EducationForm] Initialized', {

@@ -37,13 +37,13 @@ const PROFICIENCY_LEVELS = [
 ];
 
 export default function SkillForm({ skill, onSubmit, onCancel }: SkillFormProps) {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{ name: string; category: string; proficiency: string; yearsExp: string }>({
         name: skill?.name || '',
         category: skill?.category || 'Programming Languages',
         proficiency: skill?.proficiency || '',
         yearsExp: skill?.yearsExp?.toString() || '',
     });
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState<boolean>(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     logger.debug('[SkillForm] Initialized', {

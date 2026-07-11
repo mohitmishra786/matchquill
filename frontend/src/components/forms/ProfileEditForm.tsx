@@ -23,11 +23,11 @@ interface ProfileEditFormProps {
 }
 
 export default function ProfileEditForm({ currentName, currentImage, onSubmit, onCancel }: ProfileEditFormProps) {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<ProfileData>({
         name: currentName || '',
         image: currentImage || '',
     });
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState<boolean>(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     logger.debug('[ProfileEditForm] Initialized', {

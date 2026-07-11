@@ -28,7 +28,19 @@ interface ExperienceFormProps {
 }
 
 export default function ExperienceForm({ experience, onSubmit, onCancel }: ExperienceFormProps) {
-    const [formData, setFormData] = useState({
+    interface ExperienceFormState {
+        company: string;
+        title: string;
+        location: string;
+        startDate: string;
+        endDate: string;
+        current: boolean;
+        description: string;
+        highlights: string;
+        keywords: string;
+    }
+
+    const [formData, setFormData] = useState<ExperienceFormState>({
         company: experience?.company || '',
         title: experience?.title || '',
         location: experience?.location || '',
@@ -39,10 +51,10 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
         highlights: experience?.highlights?.join('\n') || '',
         keywords: experience?.keywords?.join(', ') || '',
     });
-    const [targetJD, setTargetJD] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [isEnhancing, setIsEnhancing] = useState(false);
-    const [error, setError] = useState('');
+    const [targetJD, setTargetJD] = useState<string>('');
+    const [loading, setLoading] = useState<boolean>(false);
+    const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
+    const [error, setError] = useState<string>('');
 
     const handleAuthFailure = (err: unknown): void => {
         logger.warn('[ExperienceForm] Authentication failure', {

@@ -28,7 +28,7 @@ export default function ProjectForm({ project, onSubmit, onCancel }: ProjectForm
         technologies: project?.technologies?.join(', ') || '',
         highlights: project?.highlights?.join('\n') || '',
     });
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState<boolean>(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     logger.debug('[ProjectForm] Initialized', {
