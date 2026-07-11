@@ -1,3 +1,5 @@
+import { isStrongPassword } from '@/lib/validation';
+
 function isValidEmail(email: string): boolean {
     const atIndex = email.indexOf('@');
     if (atIndex < 1) return false;
@@ -34,8 +36,12 @@ export function parseRegistrationInput(body: unknown): { email: string; password
     if (!isValidEmail(email)) {
         throw new ValidationError('Invalid email format');
     }
-    if (password.length < 8) {
-        throw new ValidationError('Password must be at least 8 characters');
+
+    const strength = isStrongPassword(password);
+    if (!strength.isValid) {
+        throw new ValidationError(
+            strength.errors[0] || 'Password does not meet strength requirements'
+        );
     }
 
     return { email, password, name };

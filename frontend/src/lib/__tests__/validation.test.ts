@@ -131,14 +131,31 @@ describe('isStrongPassword', () => {
         expect(result.errors.length).toBeGreaterThan(0);
     });
 
+    it('requires at least 10 characters', () => {
+        // 9 chars, otherwise strong
+        const result = isStrongPassword('Short1!Aa');
+        expect(result.isValid).toBe(false);
+        expect(result.errors.some((e) => e.includes('at least 10'))).toBe(true);
+    });
+
     it('detects missing uppercase', () => {
         const result = isStrongPassword('lowercase123!');
         expect(result.errors).toContain('Password must contain at least one uppercase letter');
     });
 
+    it('detects missing lowercase', () => {
+        const result = isStrongPassword('UPPERCASE123!');
+        expect(result.errors).toContain('Password must contain at least one lowercase letter');
+    });
+
     it('detects missing number', () => {
-        const result = isStrongPassword('NoNumbers!');
+        const result = isStrongPassword('NoNumbers!!');
         expect(result.errors).toContain('Password must contain at least one number');
+    });
+
+    it('detects missing special character', () => {
+        const result = isStrongPassword('NoSpecial12');
+        expect(result.errors).toContain('Password must contain at least one special character');
     });
 });
 

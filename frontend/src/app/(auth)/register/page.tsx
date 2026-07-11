@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { isStrongPassword, MIN_PASSWORD_LENGTH } from '@/lib/validation';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -29,8 +30,9 @@ export default function RegisterPage() {
             return;
         }
 
-        if (password.length < 8) {
-            setError('Password must be at least 8 characters');
+        const strength = isStrongPassword(password);
+        if (!strength.isValid) {
+            setError(strength.errors[0] || 'Password does not meet strength requirements');
             return;
         }
 
@@ -129,11 +131,14 @@ export default function RegisterPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                minLength={8}
+                                minLength={MIN_PASSWORD_LENGTH}
+                                autoComplete="new-password"
                                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
                                 placeholder="••••••••"
                             />
-                            <p className="mt-1 text-xs text-gray-500">Minimum 8 characters</p>
+                            <p className="mt-1 text-xs text-gray-500">
+                                At least {MIN_PASSWORD_LENGTH} characters with upper, lower, number, and special character
+                            </p>
                         </div>
 
                         <div>

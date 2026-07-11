@@ -155,6 +155,23 @@ describe('POST /api/auth/register', () => {
         expect(data.error).toContain('User with this email already exists');
     });
 
+
+    it('should reject password missing special character', async () => {
+        const request = new NextRequest('http://localhost:3000/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+                email: 'test@example.com',
+                password: 'SecurePass123',
+            }),
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toContain('special character');
+    });
+
     it('should enforce rate limiting', async () => {
         (isRateLimited as ReturnType<typeof vi.fn>).mockReturnValue({ limited: true });
 
