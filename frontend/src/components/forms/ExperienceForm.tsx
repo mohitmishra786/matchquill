@@ -169,22 +169,25 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                    <label htmlFor="exp-company" className="block text-sm font-medium text-gray-700 mb-1">Company</label>
                     <input
+                        id="exp-company"
                         type="text"
                         required
                         value={formData.company}
                         onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                        aria-invalid={error ? true : undefined}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="Company name"
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                    <label htmlFor="exp-title" className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
                     <input
+                        id="exp-title"
                         type="text"
                         required
                         value={formData.title}
@@ -196,8 +199,9 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <label htmlFor="exp-location" className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                 <input
+                    id="exp-location"
                     type="text"
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
@@ -208,8 +212,9 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <label htmlFor="exp-start-date" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                     <input
+                        id="exp-start-date"
                         type="date"
                         required
                         value={formData.startDate}
@@ -218,8 +223,9 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <label htmlFor="exp-end-date" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                     <input
+                        id="exp-end-date"
                         type="date"
                         value={formData.endDate}
                         onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
@@ -232,19 +238,20 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
             <div className="flex items-center gap-2">
                 <input
                     type="checkbox"
-                    id="current"
+                    id="exp-current"
                     checked={formData.current}
                     onChange={(e) => setFormData({ ...formData, current: e.target.checked })}
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                 />
-                <label htmlFor="current" className="text-sm text-gray-700">
+                <label htmlFor="exp-current" className="text-sm text-gray-700">
                     I currently work here
                 </label>
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label htmlFor="exp-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
+                    id="exp-description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows={3}
@@ -255,7 +262,7 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
 
             <div>
                 <div className="flex justify-between items-center mb-1">
-                    <label className="block text-sm font-medium text-gray-700">Key Achievements</label>
+                    <label htmlFor="exp-highlights" className="block text-sm font-medium text-gray-700">Key Achievements</label>
                     <button
                         type="button"
                         onClick={handleAIEnhance}
@@ -264,7 +271,7 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
                     >
                         {isEnhancing ? (
                             <>
-                                <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
                                 Enhancing...
                             </>
                         ) : (
@@ -274,6 +281,7 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
+                                    aria-hidden="true"
                                 >
                                     <path
                                         strokeLinecap="round"
@@ -288,22 +296,24 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
                     </button>
                 </div>
                 <textarea
+                    id="exp-highlights"
                     value={formData.highlights}
                     onChange={(e) => setFormData({ ...formData, highlights: e.target.value })}
                     rows={4}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                     placeholder="Enter each achievement on a new line"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p id="exp-highlights-help" className="mt-1 text-xs text-gray-600">
                     One achievement per line. Start with action verbs.
                 </p>
             </div>
 
             <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">
+                <label htmlFor="exp-target-jd" className="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">
                     Target Job Description (Optional for AI)
                 </label>
                 <textarea
+                    id="exp-target-jd"
                     value={targetJD}
                     onChange={(e) => setTargetJD(e.target.value)}
                     rows={2}
@@ -313,8 +323,9 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Keywords</label>
+                <label htmlFor="exp-keywords" className="block text-sm font-medium text-gray-700 mb-1">Keywords</label>
                 <input
+                    id="exp-keywords"
                     type="text"
                     value={formData.keywords}
                     onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
@@ -324,7 +335,7 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
             </div>
 
             {error && (
-                <p className="text-sm text-red-600" role="alert">
+                <p className="text-sm text-red-600" role="alert" aria-live="assertive">
                     {error}
                 </p>
             )}

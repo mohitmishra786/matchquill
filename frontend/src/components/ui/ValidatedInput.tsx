@@ -187,8 +187,9 @@ export const ValidatedInput: React.FC<ValidatedInputProps> = ({
                     id={`${inputId}-error`}
                     className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1"
                     role="alert"
+                    aria-live="assertive"
                 >
-                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" />
                     </svg>
                     {error}
@@ -197,7 +198,7 @@ export const ValidatedInput: React.FC<ValidatedInputProps> = ({
             {!showError && helperText && (
                 <p
                     id={`${inputId}-helper`}
-                    className="text-sm text-gray-500 dark:text-gray-400"
+                    className="text-sm text-gray-600 dark:text-gray-400"
                 >
                     {helperText}
                 </p>
@@ -364,8 +365,9 @@ export const ValidatedTextArea: React.FC<ValidatedTextAreaProps> = ({
                     id={`${inputId}-error`}
                     className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1"
                     role="alert"
+                    aria-live="assertive"
                 >
-                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" />
                     </svg>
                     {error}
@@ -374,7 +376,7 @@ export const ValidatedTextArea: React.FC<ValidatedTextAreaProps> = ({
             {!showError && helperText && (
                 <p
                     id={`${inputId}-helper`}
-                    className="text-sm text-gray-500 dark:text-gray-400"
+                    className="text-sm text-gray-600 dark:text-gray-400"
                 >
                     {helperText}
                 </p>

@@ -1,6 +1,7 @@
 'use client'
 
 import { deleteApplication, updateApplicationStatus } from "@/app/actions/tracker"
+import { sanitizeText, sanitizeUrl } from "@/lib/sanitization"
 
 const statusColors = {
   applied: "bg-blue-100 text-blue-800",
@@ -16,6 +17,7 @@ interface Application {
   status: string
   appliedDate: Date
   url?: string | null
+  description?: string | null
 }
 
 export function ApplicationList({ applications }: { applications: Application[] }) {
@@ -40,17 +42,26 @@ export function ApplicationList({ applications }: { applications: Application[] 
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {applications.map((app) => (
+          {applications.map((app) => {
+            const company = sanitizeText(app.company)
+            const position = sanitizeText(app.position)
+            const description = app.description ? sanitizeText(app.description) : null
+            const safeUrl = app.url ? sanitizeUrl(app.url) : null
+
+            return (
             <tr key={app.id} className="hover:bg-gray-50">
               <td className="px-6 py-4 whitespace-nowrap">
-                <div className="font-medium text-gray-900">{app.company}</div>
-                {app.url && (
-                  <a href={app.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">
+                <div className="font-medium text-gray-900">{company}</div>
+                {description && (
+                  <div className="text-xs text-gray-500 line-clamp-1">{description}</div>
+                )}
+                {safeUrl && (
+                  <a href={safeUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">
                     View Job
                   </a>
                 )}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-gray-700">{app.position}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-gray-700">{position}</td>
               <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                 {new Date(app.appliedDate).toLocaleDateString()}
               </td>
@@ -77,7 +88,8 @@ export function ApplicationList({ applications }: { applications: Application[] 
                 </button>
               </td>
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>

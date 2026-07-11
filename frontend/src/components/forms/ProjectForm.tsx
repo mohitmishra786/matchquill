@@ -110,50 +110,60 @@ export default function ProjectForm({ project, onSubmit, onCancel }: ProjectForm
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>
+                <label htmlFor="proj-name" className="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>
                 <input
+                    id="proj-name"
                     type="text"
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
+                    aria-invalid={!!errors.name}
+                    aria-describedby={errors.name ? 'proj-name-error' : undefined}
                     className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none ${errors.name ? 'border-red-500' : 'border-gray-300'
                         }`}
                     placeholder="My Awesome Project"
                 />
-                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                {errors.name && <p id="proj-name-error" className="mt-1 text-sm text-red-600" role="alert" aria-live="assertive">{errors.name}</p>}
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                <label htmlFor="proj-description" className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
                 <textarea
+                    id="proj-description"
                     value={formData.description}
                     onChange={(e) => handleChange('description', e.target.value)}
                     rows={3}
+                    aria-invalid={!!errors.description}
+                    aria-describedby={errors.description ? 'proj-description-error' : undefined}
                     className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none ${errors.description ? 'border-red-500' : 'border-gray-300'
                         }`}
                     placeholder="Brief description of the project"
                 />
-                {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
+                {errors.description && <p id="proj-description-error" className="mt-1 text-sm text-red-600" role="alert" aria-live="assertive">{errors.description}</p>}
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Project URL</label>
+                <label htmlFor="proj-url" className="block text-sm font-medium text-gray-700 mb-1">Project URL</label>
                 <input
+                    id="proj-url"
                     type="text"
                     value={formData.url}
                     onChange={(e) => handleChange('url', e.target.value)}
+                    aria-invalid={!!errors.url}
+                    aria-describedby={errors.url ? 'proj-url-error' : undefined}
                     className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none ${errors.url ? 'border-red-500' : 'border-gray-300'
                         }`}
                     placeholder="https://github.com/username/project"
                 />
-                {errors.url && <p className="mt-1 text-sm text-red-600">{errors.url}</p>}
+                {errors.url && <p id="proj-url-error" className="mt-1 text-sm text-red-600" role="alert" aria-live="assertive">{errors.url}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <label htmlFor="proj-start-date" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                     <input
+                        id="proj-start-date"
                         type="date"
                         value={formData.startDate}
                         onChange={(e) => handleChange('startDate', e.target.value)}
@@ -161,8 +171,9 @@ export default function ProjectForm({ project, onSubmit, onCancel }: ProjectForm
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <label htmlFor="proj-end-date" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                     <input
+                        id="proj-end-date"
                         type="date"
                         value={formData.endDate}
                         onChange={(e) => handleChange('endDate', e.target.value)}
@@ -172,8 +183,9 @@ export default function ProjectForm({ project, onSubmit, onCancel }: ProjectForm
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Technologies</label>
+                <label htmlFor="proj-technologies" className="block text-sm font-medium text-gray-700 mb-1">Technologies</label>
                 <input
+                    id="proj-technologies"
                     type="text"
                     value={formData.technologies}
                     onChange={(e) => handleChange('technologies', e.target.value)}
@@ -183,15 +195,17 @@ export default function ProjectForm({ project, onSubmit, onCancel }: ProjectForm
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Key Features / Highlights</label>
+                <label htmlFor="proj-highlights" className="block text-sm font-medium text-gray-700 mb-1">Key Features / Highlights</label>
                 <textarea
+                    id="proj-highlights"
                     value={formData.highlights}
                     onChange={(e) => handleChange('highlights', e.target.value)}
                     rows={4}
+                    aria-describedby="proj-highlights-help"
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                     placeholder="Enter each feature on a new line"
                 />
-                <p className="mt-1 text-xs text-gray-500">One feature per line.</p>
+                <p id="proj-highlights-help" className="mt-1 text-xs text-gray-600">One feature per line.</p>
             </div>
 
             <div className="flex gap-3 pt-4">

@@ -4,9 +4,10 @@
  * Resume Upload Component
  * Parses uploaded PDF/DOCX/TXT/MD files and extracts data
  * Shows loading status, success message, or detailed errors
+ * Supports keyboard activation and accessible status announcements
  */
 
-import { useState, useRef, ChangeEvent } from 'react';
+import { useState, useRef, useId, ChangeEvent, KeyboardEvent } from 'react';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger({ component: 'ResumeUpload' });
@@ -66,6 +67,15 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
     const [success, setSuccess] = useState(false);
     const [extractedSummary, setExtractedSummary] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const dropzoneId = useId();
+    const statusId = useId();
+    const errorId = useId();
+
+    const openFilePicker = () => {
+        if (!isProcessing) {
+            inputRef.current?.click();
+        }
+    };
 
     const handleFile = async (file: File) => {
         if (!file) return;
@@ -220,6 +230,16 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
     const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) handleFile(file);
+        // Allow re-selecting the same file
+        e.target.value = '';
+    };
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+        if (isProcessing) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openFilePicker();
+        }
     };
 
     const handleRetry = () => {
@@ -231,15 +251,25 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
         inputRef.current?.click();
     };
 
+    const dropzoneLabel = type === 'cover-letter' ? 'cover letter' : 'resume';
+
     return (
         <div className="w-full space-y-3">
             <div
+                id={dropzoneId}
+                role="button"
+                tabIndex={isProcessing ? -1 : 0}
+                aria-disabled={isProcessing}
+                aria-describedby={statusId}
+                aria-label={`Upload ${dropzoneLabel}. Drop a file here or press Enter to browse.`}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
-                onClick={() => !isProcessing && inputRef.current?.click()}
+                onClick={openFilePicker}
+                onKeyDown={handleKeyDown}
                 className={`
                     relative border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all
+                    focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
                     ${isDragOver
                         ? 'border-indigo-500 bg-indigo-50'
                         : success
@@ -256,52 +286,55 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
                     type="file"
                     accept=".pdf,.docx,.doc,.txt,.md,.markdown"
                     onChange={handleInputChange}
-                    className="hidden"
+                    className="sr-only"
                     disabled={isProcessing}
+                    tabIndex={-1}
+                    aria-hidden="true"
                 />
 
                 {isProcessing ? (
-                    <div className="space-y-3">
-                        <div className="w-12 h-12 mx-auto border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                        <p className="text-gray-600 font-medium">Processing {fileName}...</p>
-                        <p className="text-sm text-gray-500">Extracting text and analyzing content</p>
+                    <div className="space-y-3" id={statusId} role="status" aria-live="polite">
+                        <div className="w-12 h-12 mx-auto border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" aria-hidden="true"></div>
+                        <p className="text-gray-700 font-medium">Processing {fileName}...</p>
+                        <p className="text-sm text-gray-600">Extracting text and analyzing content</p>
                     </div>
                 ) : success ? (
-                    <div className="space-y-3">
+                    <div className="space-y-3" id={statusId} role="status" aria-live="polite">
                         <div className="w-12 h-12 mx-auto bg-green-100 rounded-xl flex items-center justify-center">
-                            <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
                         <div>
                             <p className="text-green-700 font-medium">{fileName} processed successfully!</p>
                             {extractedSummary && (
-                                <p className="text-sm text-green-600 mt-1">{extractedSummary}</p>
+                                <p className="text-sm text-green-700 mt-1">{extractedSummary}</p>
                             )}
                         </div>
                         <button
+                            type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleRetry();
                             }}
-                            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
                         >
                             Upload a different file
                         </button>
                     </div>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3" id={statusId}>
                         <div className="w-12 h-12 mx-auto bg-indigo-100 rounded-xl flex items-center justify-center">
-                            <svg className="w-6 h-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-6 h-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                             </svg>
                         </div>
                         <div>
                             <p className="text-gray-900 font-medium">
-                                Drop your {type === 'cover-letter' ? 'cover letter' : 'resume'} here
+                                Drop your {dropzoneLabel} here
                             </p>
-                            <p className="text-sm text-gray-500">
-                                or click to browse (PDF, DOCX, TXT, or MD, max 10MB)
+                            <p className="text-sm text-gray-600">
+                                or click / press Enter to browse (PDF, DOCX, TXT, or MD, max 10MB)
                             </p>
                         </div>
                     </div>
@@ -310,16 +343,21 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
 
             {/* Error message */}
             {error && (
-                <div className={`p-3 rounded-lg ${success ? 'bg-yellow-50 border border-yellow-200' : 'bg-red-50 border border-red-200'}`}>
+                <div
+                    id={errorId}
+                    role="alert"
+                    aria-live="assertive"
+                    className={`p-3 rounded-lg ${success ? 'bg-yellow-50 border border-yellow-200' : 'bg-red-50 border border-red-200'}`}
+                >
                     <div className="flex items-start gap-2">
-                        <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${success ? 'text-yellow-500' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${success ? 'text-yellow-600' : 'text-red-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={success ? "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" : "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"} />
                         </svg>
                         <div className="flex-1">
-                            <p className={`text-sm ${success ? 'text-yellow-700' : 'text-red-700'}`}>{error}</p>
+                            <p className={`text-sm ${success ? 'text-yellow-800' : 'text-red-700'}`}>{error}</p>
                             {errorDetails && (
                                 <details className="mt-2">
-                                    <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+                                    <summary className="text-xs text-gray-600 cursor-pointer hover:text-gray-800">
                                         Show technical details
                                     </summary>
                                     <pre className="mt-1 text-xs bg-gray-100 p-2 rounded overflow-auto max-h-32">
@@ -329,8 +367,9 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
                             )}
                             {!success && (
                                 <button
+                                    type="button"
                                     onClick={handleRetry}
-                                    className="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                    className="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
                                 >
                                     Try again
                                 </button>

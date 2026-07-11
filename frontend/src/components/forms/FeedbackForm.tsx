@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/components/ui/ToastProvider';
+import { sanitizeFeedbackData } from '@/lib/sanitization';
 
 export default function FeedbackForm() {
     const [rating, setRating] = useState(5);
@@ -14,10 +15,11 @@ export default function FeedbackForm() {
         e.preventDefault();
         setLoading(true);
         try {
+            const sanitized = sanitizeFeedbackData({ rating, comment, category });
             const res = await fetch('/api/feedback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rating, comment, category }),
+                body: JSON.stringify(sanitized),
             });
             if (res.ok) {
                 success('Thank you for your feedback!');

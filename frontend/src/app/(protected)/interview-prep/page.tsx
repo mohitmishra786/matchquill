@@ -6,6 +6,7 @@ import { createLogger } from '@/lib/logger';
 import { useToast } from '@/components/ui/ToastProvider';
 import { auth } from '@/lib/auth';
 import { generateBackendToken } from '@/lib/jwt';
+import { sanitizeRichText, sanitizeText } from '@/lib/sanitization';
 
 const logger = createLogger({ component: 'InterviewPrepPage' });
 
@@ -61,6 +62,10 @@ Skills: ${data.skills?.map((s: Skill) => s.name).join(', ')}
 
             const backendToken = await generateBackendToken(authSession.user.id, authSession.user.email || undefined);
 
+            const sanitizedJD = jobDescription.trim()
+                ? sanitizeRichText(jobDescription)
+                : undefined;
+
             const res = await fetch('/api/ai/interview-prep', {
                 method: 'POST',
                 headers: {
@@ -68,8 +73,8 @@ Skills: ${data.skills?.map((s: Skill) => s.name).join(', ')}
                     'Authorization': `Bearer ${backendToken}`,
                 },
                 body: JSON.stringify({
-                    candidate_info: candidateInfo,
-                    job_description: jobDescription || undefined
+                    candidate_info: sanitizeText(candidateInfo),
+                    job_description: sanitizedJD || undefined,
                 }),
             });
             const data = await res.json();

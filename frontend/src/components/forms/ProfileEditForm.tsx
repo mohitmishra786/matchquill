@@ -83,32 +83,38 @@ export default function ProfileEditForm({ currentName, currentImage, onSubmit, o
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                <label htmlFor="profile-name" className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                 <input
+                    id="profile-name"
                     type="text"
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
+                    aria-invalid={!!errors.name}
+                    aria-describedby={errors.name ? 'profile-name-error' : undefined}
                     className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none ${errors.name ? 'border-red-500' : 'border-gray-300'
                         }`}
                     placeholder="John Doe"
                 />
-                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                {errors.name && <p id="profile-name-error" className="mt-1 text-sm text-red-600" role="alert" aria-live="assertive">{errors.name}</p>}
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Profile Image URL</label>
+                <label htmlFor="profile-image" className="block text-sm font-medium text-gray-700 mb-1">Profile Image URL</label>
                 <input
+                    id="profile-image"
                     type="text"
                     value={formData.image}
                     onChange={(e) => handleChange('image', e.target.value)}
+                    aria-invalid={!!errors.image}
+                    aria-describedby={errors.image ? 'profile-image-error' : 'profile-image-help'}
                     className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none ${errors.image ? 'border-red-500' : 'border-gray-300'
                         }`}
                     placeholder="https://example.com/your-photo.jpg"
                 />
-                {errors.image && <p className="mt-1 text-sm text-red-600">{errors.image}</p>}
-                <p className="mt-1 text-xs text-gray-500">Enter a URL to your profile photo</p>
+                {errors.image && <p id="profile-image-error" className="mt-1 text-sm text-red-600" role="alert" aria-live="assertive">{errors.image}</p>}
+                <p id="profile-image-help" className="mt-1 text-xs text-gray-600">Enter a URL to your profile photo</p>
             </div>
 
             {formData.image && !errors.image && (

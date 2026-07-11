@@ -352,8 +352,13 @@ I am writing to express my interest in..."
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
                                             <h3 className="font-semibold text-gray-900">
-                                                {cl.jobTitle || 'Cover Letter'}
-                                                {cl.companyName && <span className="text-gray-600"> @ {cl.companyName}</span>}
+                                                {sanitizeText(cl.jobTitle) || 'Cover Letter'}
+                                                {cl.companyName && (
+                                                    <span className="text-gray-600">
+                                                        {' '}
+                                                        @ {sanitizeText(cl.companyName)}
+                                                    </span>
+                                                )}
                                             </h3>
                                             <p className="text-sm text-gray-600">
                                                 Created {new Date(cl.createdAt).toLocaleDateString()}
@@ -363,14 +368,16 @@ I am writing to express my interest in..."
                                             type="button"
                                             onClick={() => handleDelete(cl.id)}
                                             className="text-gray-500 hover:text-red-600 p-1"
-                                            aria-label={`Delete cover letter ${cl.jobTitle || cl.id}`}
+                                            aria-label={`Delete cover letter ${sanitizeText(cl.jobTitle) || cl.id}`}
                                         >
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
                                     </div>
-                                    <p className="text-gray-600 text-sm line-clamp-3">{cl.content}</p>
+                                    <p className="text-gray-600 text-sm line-clamp-3">
+                                        {sanitizeText(cl.content)}
+                                    </p>
                                 </div>
                             ))}
                             <button

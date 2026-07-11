@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import Toast, { ToastType } from './Toast';
+import { sanitizeText } from '@/lib/sanitization';
 
 interface ToastContextType {
   addToast: (message: string, type: ToastType, duration?: number) => void;
@@ -28,8 +29,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const addToast = useCallback((message: string, type: ToastType, duration = 3000) => {
     const id = Math.random().toString(36).substring(2, 11);
+    const safeMessage = sanitizeText(message) || 'Notification';
     setToasts((prev) => {
-      const newToasts = [...prev, { id, message, type, duration }];
+      const newToasts = [...prev, { id, message: safeMessage, type, duration }];
       return newToasts.slice(-MAX_TOASTS);
     });
   }, []);
