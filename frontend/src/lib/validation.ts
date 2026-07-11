@@ -105,8 +105,12 @@ export function inRange(value: number, min: number, max: number): boolean {
     return value >= min && value <= max;
 }
 
+/** Minimum password length for registration and password changes */
+export const MIN_PASSWORD_LENGTH = 10;
+
 /**
- * Validate strong password
+ * Validate strong password (production policy).
+ * Requires length >= 10, upper, lower, digit, and special character.
  */
 export function isStrongPassword(password: string): {
     isValid: boolean;
@@ -114,8 +118,8 @@ export function isStrongPassword(password: string): {
 } {
     const errors: string[] = [];
 
-    if (password.length < 8) {
-        errors.push('Password must be at least 8 characters');
+    if (password.length < MIN_PASSWORD_LENGTH) {
+        errors.push(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
     }
     if (!/[A-Z]/.test(password)) {
         errors.push('Password must contain at least one uppercase letter');
@@ -126,7 +130,7 @@ export function isStrongPassword(password: string): {
     if (!/[0-9]/.test(password)) {
         errors.push('Password must contain at least one number');
     }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    if (!/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/]/.test(password)) {
         errors.push('Password must contain at least one special character');
     }
 
@@ -518,8 +522,9 @@ export function parseAndValidateRegistrationInput(body: unknown): { email: strin
     if (!isValidEmail(email)) {
         throw new ValidationError('Invalid email format');
     }
-    if (password.length < 8) {
-        throw new ValidationError('Password must be at least 8 characters');
+    const strength = isStrongPassword(password);
+    if (!strength.isValid) {
+        throw new ValidationError(strength.errors[0] || 'Password does not meet requirements');
     }
 
     return { email, password, name };

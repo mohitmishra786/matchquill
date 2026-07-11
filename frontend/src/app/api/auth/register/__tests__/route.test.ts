@@ -58,7 +58,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: 'SecurePass123!',
                 name: 'Test User',
             }),
         });
@@ -69,14 +69,14 @@ describe('POST /api/auth/register', () => {
         expect(response.status).toBe(201);
         expect(data.message).toBe('User created successfully');
         expect(data.user.email).toBe('test@example.com');
-        expect(bcrypt.hash).toHaveBeenCalledWith('securepass123', 12);
+        expect(bcrypt.hash).toHaveBeenCalledWith('SecurePass123!', 12);
     });
 
     it('should reject registration without email', async () => {
         const request = new NextRequest('http://localhost:3000/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({
-                password: 'securepass123',
+                password: 'SecurePass123!',
             }),
         });
 
@@ -107,7 +107,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'invalid-email',
-                password: 'securepass123',
+                password: 'SecurePass123!',
             }),
         });
 
@@ -118,7 +118,7 @@ describe('POST /api/auth/register', () => {
         expect(data.error).toContain('Invalid email format');
     });
 
-    it('should reject password shorter than 8 characters', async () => {
+    it('should reject password shorter than 10 characters', async () => {
         const request = new NextRequest('http://localhost:3000/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({
@@ -131,7 +131,7 @@ describe('POST /api/auth/register', () => {
         const data = await response.json();
 
         expect(response.status).toBe(400);
-        expect(data.error).toContain('Password must be at least 8 characters');
+        expect(data.error).toContain('Password must be at least 10 characters');
     });
 
     it('should reject registration if user already exists', async () => {
@@ -144,7 +144,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: 'SecurePass123!',
             }),
         });
 
@@ -162,7 +162,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: 'SecurePass123!',
             }),
         });
 
@@ -182,7 +182,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: 'SecurePass123!',
             }),
         });
 
@@ -208,7 +208,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: 'SecurePass123!',
             }),
         });
 
@@ -236,7 +236,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: 'SecurePass123!',
                 name: 'Test User',
             }),
         });
