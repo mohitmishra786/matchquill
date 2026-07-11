@@ -160,6 +160,7 @@ async def test_deduplicator_ttl_expiration(deduplicator):
     try:
         await task
     except asyncio.CancelledError:
+        # Expected when cancelling an in-flight deduplicated coroutine
         pass
 
 
@@ -216,8 +217,9 @@ async def test_get_stats(deduplicator):
     assert stats["requests"][0]["key"].startswith("test:")
     assert len(stats["requests"][0]["key"]) == len("test:") + 16  # prefix + 16-char hash
 
-    # Wait for the request to complete
-    await task
+    # Wait for the request to complete and assert its result
+    result = await task
+    assert result == 10
 
     # Stats should show no in-flight requests
     stats = deduplicator.get_stats()

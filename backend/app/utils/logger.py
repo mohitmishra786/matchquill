@@ -228,9 +228,22 @@ class CVWizLogger:
         self.logger.propagate = False
     
     def _log(self, level: int, message: str, data: Optional[Dict[str, Any]] = None, **kwargs):
-        """Internal log method with data support"""
-        extra = {'data': data} if data else {}
-        self.logger.log(level, message, extra=extra, **kwargs)
+        """
+        Internal log method with data support.
+
+        CodeQL py/log-injection: strip CR/LF from message strings (recognized
+        sanitizer) and sanitize structured data before writing.
+        See https://codeql.github.com/codeql-query-help/python/py-log-injection/
+        """
+        safe_message = (
+            (message or "")
+            .replace("\r\n", "")
+            .replace("\n", "")
+            .replace("\r", "")
+        )
+        safe_data = sanitize_dict(data) if isinstance(data, dict) else data
+        extra = {"data": safe_data} if safe_data is not None else {}
+        self.logger.log(level, safe_message, extra=extra, **kwargs)
     
     def debug(self, message: str, data: Optional[Dict[str, Any]] = None):
         self._log(logging.DEBUG, message, data)
@@ -497,7 +510,9 @@ def sanitize_dict(data: Dict[str, Any], sensitive_keys: Optional[set] = None) ->
             sanitized[safe_key] = sanitize_dict(value, sensitive_keys)
         elif isinstance(value, list):
             sanitized[safe_key] = [
-                sanitize_dict(item, sensitive_keys) if isinstance(item, dict) else item
+                sanitize_dict(item, sensitive_keys)
+                if isinstance(item, dict)
+                else (_safe_log_value(item, max_len=500) if isinstance(item, str) else item)
                 for item in value
             ]
         else:

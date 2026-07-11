@@ -309,7 +309,9 @@ class PDFGenerator:
     
     def __init__(self):
         """Initialize PDF generator with Jinja2 environment and shared font config."""
-        self.env = Environment(loader=BaseLoader())
+        # autoescape=True mitigates XSS if user profile fields ever reach HTML
+        # (CodeQL py/jinja2/autoescape-false)
+        self.env = Environment(loader=BaseLoader(), autoescape=True)
         self.template = self.env.from_string(RESUME_TEMPLATE)
         self.font_config = get_shared_font_configuration()
     

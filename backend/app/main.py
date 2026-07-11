@@ -252,7 +252,11 @@ async def health_check():
         system_metrics["memory_percent"] = psutil.virtual_memory().percent
         system_metrics["disk_usage_percent"] = psutil.disk_usage('/').percent
     except Exception as e:
-        logger.warning(f"[HEALTH] Failed to get system metrics: {e}")
+        # Do not interpolate exception text into the log message (log-injection)
+        logger.warning(
+            "[HEALTH] Failed to get system metrics",
+            {"error_type": type(e).__name__},
+        )
 
     health_status = {
         "status": "healthy",
@@ -274,8 +278,12 @@ async def health_check():
             health_status["redis"] = "connected"
             logger.debug("[HEALTH] Redis connection OK")
     except Exception as e:
-        health_status["redis"] = f"error: {str(e)}"
-        logger.warning("[HEALTH] Redis connection failed", {"error": str(e)})
+        # CodeQL py/stack-trace-exposure: never return exception details to clients
+        health_status["redis"] = "error"
+        logger.warning(
+            "[HEALTH] Redis connection failed",
+            {"error_type": type(e).__name__},
+        )
     
     logger.info("[HEALTH] Health check complete", health_status)
     return health_status

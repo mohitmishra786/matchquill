@@ -54,10 +54,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return true;
 
         case 'OPEN_PROFILE':
-            const config = await getConfigWithCache();
-            chrome.tabs.create({ url: `${config.FRONTEND_URL}/profile` });
-            sendResponse({ success: true });
-            break;
+            // Must not use await in non-async onMessage callback (CodeQL js/syntax-error)
+            getConfigWithCache()
+                .then((config) => {
+                    chrome.tabs.create({ url: `${config.FRONTEND_URL}/profile` });
+                    sendResponse({ success: true });
+                })
+                .catch((error) => {
+                    sendResponse({ success: false, error: error.message });
+                });
+            return true;
 
         case 'GET_CONFIG':
             getConfigWithCache()

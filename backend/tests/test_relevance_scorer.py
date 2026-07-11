@@ -232,15 +232,16 @@ def test_scorer_cache_stats():
     assert initial_stats["cached_entries"] == 0
     assert initial_stats["max_size"] == 100
 
-    # Create some scorers
+    # Create some scorers (two unique JDs + one cache hit)
     scorer1 = RelevanceScorer("Python Developer")
-    scorer2 = RelevanceScorer("Java Developer")  # noqa: F841
+    _scorer_java = RelevanceScorer("Java Developer")
     scorer3 = RelevanceScorer("Python Developer")  # Same as scorer1
 
     # Check stats
     stats = RelevanceScorer.get_cache_stats()
     assert stats["cached_entries"] == 2  # Only 2 unique job descriptions
     assert len(stats["cache_keys"]) == 2
+    assert _scorer_java is not scorer1
 
     # scorer1 and scorer3 should be the same instance
     assert scorer1 is scorer3

@@ -11,8 +11,6 @@ import {
     focusLast,
     trapFocus,
     useKeyboardNavigation,
-    useKeyboardShortcuts, // eslint-disable-line @typescript-eslint/no-unused-vars
-    useFocusTrap, // eslint-disable-line @typescript-eslint/no-unused-vars
     useArrowKeyNavigation,
     commonShortcuts,
     createListAriaAttributes,
