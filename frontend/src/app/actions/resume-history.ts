@@ -7,6 +7,33 @@ import { revalidatePath } from "next/cache"
 import { Prisma } from "@prisma/client"
 import { logger } from '@/lib/logger';
 
+/** Max versions retained per user to bound storage growth */
+export const MAX_RESUME_VERSIONS = 20
+/** Soft size budget for snapshot JSON (characters) before field trimming */
+export const MAX_SNAPSHOT_JSON_CHARS = 500_000
+
+/**
+ * Strip DB-only fields and oversized text so snapshots stay lean.
+ */
+function compactSnapshotEntity<T extends Record<string, unknown>>(
+  entity: T,
+  dropKeys: string[] = ['userId', 'createdAt', 'updatedAt']
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(entity)) {
+    if (dropKeys.includes(key)) continue
+    // Cap long free-text fields
+    if (typeof value === 'string' && value.length > 5000) {
+      out[key] = value.slice(0, 5000)
+    } else if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
+      out[key] = (value as string[]).map((s) => (s.length > 1000 ? s.slice(0, 1000) : s))
+    } else {
+      out[key] = value
+    }
+  }
+  return out
+}
+
 export async function createResumeSnapshot(name?: string) {
   const session = await auth()
   if (!session?.user?.id) return { error: "Unauthorized" }
@@ -26,14 +53,24 @@ export async function createResumeSnapshot(name?: string) {
 
     if (!user) return { error: "User not found" }
 
-    // Create snapshot payload
+    // Create compact snapshot payload (omit userId/timestamps to cut storage)
     const snapshot = {
-      experiences: user.experiences,
-      projects: user.projects,
-      educations: user.educations,
-      skills: user.skills,
-      publications: user.publications,
+      experiences: user.experiences.map((e) => compactSnapshotEntity(e as unknown as Record<string, unknown>)),
+      projects: user.projects.map((p) => compactSnapshotEntity(p as unknown as Record<string, unknown>)),
+      educations: user.educations.map((e) => compactSnapshotEntity(e as unknown as Record<string, unknown>)),
+      skills: user.skills.map((s) => compactSnapshotEntity(s as unknown as Record<string, unknown>)),
+      publications: user.publications.map((p) => compactSnapshotEntity(p as unknown as Record<string, unknown>)),
       capturedAt: new Date().toISOString(),
+      schemaVersion: 1,
+    }
+
+    const serialized = JSON.stringify(snapshot)
+    if (serialized.length > MAX_SNAPSHOT_JSON_CHARS) {
+      logger.warn('[ResumeHistory] Snapshot exceeds size budget', {
+        size: serialized.length,
+        max: MAX_SNAPSHOT_JSON_CHARS,
+      })
+      return { success: false, error: 'Snapshot too large to store. Reduce profile content and try again.' }
     }
 
     await prisma.resumeVersion.create({
@@ -43,6 +80,19 @@ export async function createResumeSnapshot(name?: string) {
         snapshot: snapshot as unknown as Prisma.InputJsonValue,
       },
     })
+
+    // Enforce retention: keep only the newest MAX_RESUME_VERSIONS
+    const allVersions = await prisma.resumeVersion.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    })
+    if (allVersions.length > MAX_RESUME_VERSIONS) {
+      const toDelete = allVersions.slice(MAX_RESUME_VERSIONS).map((v) => v.id)
+      await prisma.resumeVersion.deleteMany({
+        where: { id: { in: toDelete }, userId: session.user.id },
+      })
+    }
 
     revalidatePath("/resumes/history")
     return { success: true };
@@ -220,64 +270,6 @@ export async function restoreResumeVersion(versionId: string) {
 
       if (snapshot.publications?.length) {
         await tx.publication.createMany({
-
-          data: snapshot.publications.map((p: any) => ({
-            userId,
-            title: p.title,
-            venue: p.venue,
-            authors: p.authors,
-            date: p.date,
-            url: p.url,
-            doi: p.doi,
-            abstract: p.abstract,
-          })),
-        })
-      }
-
-      if (snapshot.projects?.length) {
-        await tx.project.createMany({
-          data: snapshot.projects.map((p: any) => ({
-            userId,
-            name: p.name,
-            description: p.description,
-            url: p.url,
-            startDate: p.startDate,
-            endDate: p.endDate,
-            technologies: p.technologies,
-            highlights: p.highlights,
-          })),
-        })
-      }
-
-      if (snapshot.educations?.length) {
-        await tx.education.createMany({
-          data: snapshot.educations.map((e: any) => ({
-            userId,
-            institution: e.institution,
-            degree: e.degree,
-            field: e.field,
-            startDate: e.startDate,
-            endDate: e.endDate,
-            gpa: e.gpa,
-            honors: e.honors,
-          })),
-        })
-      }
-
-      if (snapshot.skills?.length) {
-        await tx.skill.createMany({
-          data: snapshot.skills.map((s: any) => ({
-            userId,
-            name: s.name,
-            category: s.category,
-            proficiency: s.proficiency,
-            yearsExp: s.yearsExp,
-          })),
-        })
-      }
-
-      if (snapshot.publications?.length) {
-        await tx.publication.createMany({
           data: snapshot.publications.map((p: any) => ({
             userId,
             title: p.title,
@@ -295,7 +287,7 @@ export async function restoreResumeVersion(versionId: string) {
     revalidatePath("/profile")
     return { success: true }
   } catch (error) {
-    console.error("Restore error:", error)
+    logger.error('[ResumeHistory] Restore failed', { error })
     return { error: "Failed to restore version" }
   }
 }
