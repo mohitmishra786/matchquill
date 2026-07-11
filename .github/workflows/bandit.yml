@@ -54,4 +54,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
-          category: /language:python-bandit
+          # Omit custom category so GitHub uses the default:
+          #   ".github/workflows/bandit.yml:bandit"
+          # Matching main's configuration (from shundor/python-bandit-scan)
+          # avoids: "1 configuration present on main was not found".
