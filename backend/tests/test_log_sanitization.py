@@ -95,13 +95,6 @@ class TestSanitizeHeaders:
 
 class TestSanitizeQueryParams:
     def test_masks_sensitive_and_lengths_others(self):
-        class FakeParams:
-            def items(self):
-                return [("token", "secret"), ("q", "hello")].__iter__()
-
-            def __iter__(self):
-                return self.items()
-
         # Use a plain dict via dict() constructor path
         class Mapping(dict):
             pass
