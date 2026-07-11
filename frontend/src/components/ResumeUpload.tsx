@@ -213,6 +213,16 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
             onDataExtracted(extractedData);
 
         } catch (err) {
+            // Ignore abort — user cancelled or a newer upload superseded this one
+            if (
+                (err instanceof DOMException && err.name === 'AbortError') ||
+                (err instanceof Error && err.name === 'AbortError') ||
+                controller.signal.aborted
+            ) {
+                logger.info('[ResumeUpload] Upload cancelled');
+                return;
+            }
+
             const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
             const errorStack = err instanceof Error ? err.stack : undefined;
 
@@ -222,25 +232,44 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
             });
             logger.failOperation('ResumeUpload:handleFile', err);
 
-            // Ignore abort errors from cancelled uploads
-            if (err instanceof Error && err.name === 'AbortError') {
-                logger.info('[ResumeUpload] Upload cancelled');
-                return;
-            }
             setError(`Failed to process file: ${errorMessage}`);
             if (errorStack) {
                 setErrorDetails(errorStack);
             }
         } finally {
-            setIsProcessing(false);
+            if (abortRef.current === controller) {
+                setIsProcessing(false);
+            }
         }
+    };
+
+    const cancelUpload = () => {
+        if (selectDebounceRef.current) {
+            clearTimeout(selectDebounceRef.current);
+            selectDebounceRef.current = null;
+        }
+        abortRef.current?.abort();
+        abortRef.current = null;
+        setIsProcessing(false);
+        logger.info('[ResumeUpload] User cancelled upload');
+    };
+
+    /** Debounce rapid file selection / drop events to avoid thrashing uploads */
+    const scheduleFile = (file: File) => {
+        if (selectDebounceRef.current) {
+            clearTimeout(selectDebounceRef.current);
+        }
+        selectDebounceRef.current = setTimeout(() => {
+            selectDebounceRef.current = null;
+            void handleFile(file);
+        }, 200);
     };
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragOver(false);
         const file = e.dataTransfer.files[0];
-        handleFile(file);
+        if (file) scheduleFile(file);
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -256,14 +285,7 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
         const file = e.target.files?.[0];
         // Allow re-selecting the same file
         e.target.value = '';
-        if (!file) return;
-        // Debounce rapid successive file selections
-        if (selectDebounceRef.current) {
-            clearTimeout(selectDebounceRef.current);
-        }
-        selectDebounceRef.current = setTimeout(() => {
-            void handleFile(file);
-        }, 150);
+        if (file) scheduleFile(file);
     };
 
     const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
