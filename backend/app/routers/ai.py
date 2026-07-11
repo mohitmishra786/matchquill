@@ -10,7 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app.middleware.auth import verify_auth_token
+from app.middleware.auth import verify_auth_token_with_db
 from app.services.groq_client import GroqClient
 from app.utils.logger import logger
 from app.utils.rate_limiter import RateLimitConfig, limiter
@@ -64,7 +64,7 @@ def _apply_limit(limit_value: object):  # type: ignore[no-untyped-def]
 async def enhance_bullet(
     request: Request,
     body: EnhanceBulletRequest,
-    user_id: str = Depends(verify_auth_token),
+    user_id: str = Depends(verify_auth_token_with_db),
 ) -> dict:
     """Rewrite a resume bullet point to be more impactful and relevant."""
     logger.info("[AI] Enhancing bullet", {"user_id": user_id})
@@ -87,7 +87,7 @@ async def enhance_bullet(
 async def interview_prep(
     request: Request,
     body: InterviewPrepRequest,
-    user_id: str = Depends(verify_auth_token),
+    user_id: str = Depends(verify_auth_token_with_db),
 ) -> dict:
     """Generate interview questions and answers based on candidate info and job desc."""
     logger.info("[AI] Generating interview prep", {"user_id": user_id})
@@ -110,7 +110,7 @@ async def interview_prep(
 async def suggest_skills(
     request: Request,
     body: SkillSuggestionRequest,
-    user_id: str = Depends(verify_auth_token),
+    user_id: str = Depends(verify_auth_token_with_db),
 ) -> dict:
     """Suggest skills based on experience description."""
     logger.info("[AI] Suggesting skills", {"user_id": user_id})
