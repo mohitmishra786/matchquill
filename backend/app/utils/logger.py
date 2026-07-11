@@ -241,7 +241,15 @@ class CVWizLogger:
             .replace("\n", "")
             .replace("\r", "")
         )
-        safe_data = sanitize_dict(data) if isinstance(data, dict) else data
+        if data is None:
+            safe_data = None
+        else:
+            normalized_data: Dict[str, Any]
+            if isinstance(data, dict):
+                normalized_data = data
+            else:
+                normalized_data = {"value": data}
+            safe_data = sanitize_dict(normalized_data)
         extra = {"data": safe_data} if safe_data is not None else {}
         self.logger.log(level, safe_message, extra=extra, **kwargs)
     
