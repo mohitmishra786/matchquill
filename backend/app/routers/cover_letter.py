@@ -34,19 +34,32 @@ def get_auth_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> str:
     """
-    Extract auth token from Authorization header (preferred) or request body (fallback).
-    
-    This provides backward compatibility while encouraging secure header-based auth.
+    Extract auth token from Authorization header (preferred).
+
+    Body ``authToken`` is deprecated and kept only for backward compatibility.
+    New clients must send ``Authorization: Bearer <token>``.
     """
     if credentials and credentials.credentials:
         return credentials.credentials
-    
+
     if cover_request.auth_token:
+        logger.warning(
+            "DEPRECATED: authToken in request body is deprecated; "
+            "use Authorization: Bearer header instead",
+            {
+                "auth_source": "body",
+                "endpoint": "cover_letter",
+            },
+        )
         return cover_request.auth_token
-    
+
     raise HTTPException(
         status_code=401,
-        detail="Missing authentication token. Provide via Authorization header or authToken field.",
+        detail=(
+            "Missing authentication token. "
+            "Provide via Authorization: Bearer header "
+            "(body authToken is deprecated)."
+        ),
     )
 
 
