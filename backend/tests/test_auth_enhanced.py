@@ -13,6 +13,7 @@ from app.middleware.auth import (
     verify_auth_token_with_db,
     optional_auth,
     get_user_id_from_token,
+    clear_db_auth_cache,
 )
 
 
@@ -85,6 +86,12 @@ class TestVerifyAuthToken:
 
 class TestVerifyAuthTokenWithDB:
     """Tests for verify_auth_token_with_db function (with database validation)."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_auth_cache(self):
+        clear_db_auth_cache()
+        yield
+        clear_db_auth_cache()
     
     @pytest.mark.asyncio
     async def test_verify_auth_with_db_success(self, mock_credentials, mock_settings):
@@ -143,6 +150,27 @@ class TestVerifyAuthTokenWithDB:
                     assert exc_info.value.status_code == 401
                     assert "does not match" in exc_info.value.detail.lower()
                     mock_service.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_verify_auth_with_db_uses_cache(self, mock_credentials, mock_settings):
+        """Second call with same token should hit cache and skip ProfileService."""
+        with patch('app.middleware.auth.get_settings', return_value=mock_settings):
+            with patch('app.middleware.auth.jwt.decode') as mock_decode:
+                mock_decode.return_value = {"sub": "user123"}
+
+                mock_service = AsyncMock()
+                mock_service.validate_token.return_value = "user123"
+                mock_service.close = AsyncMock()
+
+                with patch('app.services.profile_service.ProfileService', return_value=mock_service) as mock_cls:
+                    first = await verify_auth_token_with_db(mock_credentials)
+                    second = await verify_auth_token_with_db(mock_credentials)
+
+                    assert first == "user123"
+                    assert second == "user123"
+                    # ProfileService constructed once; cache serves second call
+                    assert mock_cls.call_count == 1
+                    mock_service.validate_token.assert_called_once()
 
 
 class TestOptionalAuth:

@@ -224,26 +224,62 @@ export function exportToWord(
 // ============================================================================
 
 /**
- * Download a blob as a file
+ * Reusable hidden download anchor — avoids creating/destroying DOM nodes
+ * on every download (reduces layout thrashing).
  */
-function downloadBlob(blob: Blob, filename: string): void {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+let sharedDownloadAnchor: HTMLAnchorElement | null = null;
+
+function getDownloadAnchor(): HTMLAnchorElement {
+    if (typeof document === 'undefined') {
+        throw new Error('downloadBlob requires a browser environment');
+    }
+    if (!sharedDownloadAnchor) {
+        sharedDownloadAnchor = document.createElement('a');
+        sharedDownloadAnchor.setAttribute('aria-hidden', 'true');
+        sharedDownloadAnchor.style.display = 'none';
+        document.body.appendChild(sharedDownloadAnchor);
+    }
+    return sharedDownloadAnchor;
 }
 
 /**
- * Escape HTML special characters
+ * Download a blob as a file using a single reusable anchor element.
+ * Avoids create/append/remove thrashing on every export call.
  */
-function escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+export function downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = getDownloadAnchor();
+    // Revoke previous blob URL if still attached
+    if (link.href && link.href.startsWith('blob:')) {
+        try {
+            URL.revokeObjectURL(link.href);
+        } catch {
+            /* ignore */
+        }
+    }
+    link.href = url;
+    link.download = filename;
+    link.click();
+    // Delay revoke so the browser can start the download
+    window.setTimeout(() => {
+        URL.revokeObjectURL(url);
+        if (sharedDownloadAnchor?.getAttribute('href') === url) {
+            sharedDownloadAnchor.removeAttribute('href');
+            sharedDownloadAnchor.removeAttribute('download');
+        }
+    }, 1000);
+}
+
+/**
+ * Escape HTML special characters without touching the DOM
+ */
+export function escapeHtml(text: string): string {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // ============================================================================

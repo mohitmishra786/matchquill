@@ -41,11 +41,24 @@ def mock_groq_client():
 
 
 @pytest.fixture
-def client(mock_groq_client):
+def mock_db_auth():
+    """Mock DB user validation used by verify_auth_token_with_db."""
+    mock_service = AsyncMock()
+    mock_service.validate_token.return_value = "test-user-id"
+    mock_service.close = AsyncMock()
+    with patch("app.services.profile_service.ProfileService", return_value=mock_service):
+        yield mock_service
+
+
+@pytest.fixture
+def client(mock_groq_client, mock_db_auth):
     """Create test client with mocked dependencies."""
+    from app.middleware.auth import clear_db_auth_cache
+    clear_db_auth_cache()
     with patch("app.routers.ai.GroqClient", return_value=mock_groq_client):
         with TestClient(app) as c:
             yield c
+    clear_db_auth_cache()
 
 
 class TestAIAuthentication:
@@ -125,3 +138,18 @@ class TestAIAuthentication:
         
         assert response.status_code == 400
         assert "too short" in response.json()["detail"].lower()
+
+    def test_ai_routes_reject_when_user_not_in_db(self, client, valid_token, mock_db_auth):
+        """AI routes must use verify_auth_token_with_db and reject deleted users."""
+        mock_db_auth.validate_token.return_value = None
+        from app.middleware.auth import clear_db_auth_cache
+        clear_db_auth_cache()
+
+        response = client.post(
+            "/ai/enhance-bullet",
+            json={"bullet": "Led a team of developers"},
+            headers={"Authorization": f"Bearer {valid_token}"},
+        )
+
+        assert response.status_code == 401
+        assert "not found" in response.json()["detail"].lower()

@@ -1,11 +1,12 @@
 """
 Profile Service
 Fetches user profile data from the Next.js frontend API.
-Uses shared HTTP client for better resource management.
+Uses shared HTTP client for better resource management with connection pooling.
+Includes retry with exponential backoff for transient failures.
 """
 
 import time
-from typing import Optional
+from typing import Optional, TypeVar, Callable, Awaitable
 import asyncio
 import httpx
 
@@ -18,19 +19,72 @@ from app.utils.logger import logger, get_request_id, log_auth_operation
 _http_client = None
 _http_client_lock = asyncio.Lock()
 
+# Retry defaults for transient network / 5xx failures
+MAX_RETRIES = 3
+RETRY_BASE_DELAY_SEC = 0.25
+RETRYABLE_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
+
+T = TypeVar("T")
+
 
 async def get_shared_http_client() -> httpx.AsyncClient:
-    """Get or create the shared HTTP client instance."""
+    """
+    Get or create the shared HTTP client instance.
+
+    Connection pooling (httpx.Limits) reuses TCP connections across requests
+    to reduce latency and socket churn under load.
+    """
     global _http_client
     async with _http_client_lock:
         if _http_client is None:
             _http_client = httpx.AsyncClient(
-                timeout=30.0,
+                timeout=httpx.Timeout(30.0, connect=10.0),
                 follow_redirects=True,
-                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                limits=httpx.Limits(
+                    max_keepalive_connections=20,
+                    max_connections=50,
+                    keepalive_expiry=30.0,
+                ),
             )
-            logger.info("[ProfileService] Shared HTTP client created")
+            logger.info("[ProfileService] Shared HTTP client created with connection pool")
     return _http_client
+
+
+async def _with_retry(
+    operation: str,
+    func: Callable[[], Awaitable[T]],
+    *,
+    max_retries: int = MAX_RETRIES,
+) -> T:
+    """
+    Execute an async callable with exponential backoff on transient errors.
+    """
+    last_error: Optional[BaseException] = None
+    for attempt in range(max_retries):
+        try:
+            return await func()
+        except httpx.TimeoutException as e:
+            last_error = e
+        except httpx.TransportError as e:
+            last_error = e
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code not in RETRYABLE_STATUS:
+                raise
+            last_error = e
+        if attempt < max_retries - 1:
+            delay = RETRY_BASE_DELAY_SEC * (2 ** attempt)
+            logger.warning(
+                f"[ProfileService] Retrying {operation}",
+                {
+                    "attempt": attempt + 1,
+                    "max_retries": max_retries,
+                    "delay_sec": delay,
+                    "error": str(last_error),
+                },
+            )
+            await asyncio.sleep(delay)
+    assert last_error is not None
+    raise last_error
 
 
 async def close_shared_http_client():
@@ -82,14 +136,22 @@ class ProfileService:
                 "url": f"{self.base_url}/api/profile",
             })
             
-            client = await get_shared_http_client()
-            response = await client.get(
-                f"{self.base_url}/api/profile",
-                headers={
-                    "Authorization": f"Bearer {auth_token}",
-                    "Content-Type": "application/json",
-                },
-            )
+            async def _fetch() -> httpx.Response:
+                client = await get_shared_http_client()
+                resp = await client.get(
+                    f"{self.base_url}/api/profile",
+                    headers={
+                        "Authorization": f"Bearer {auth_token}",
+                        "Content-Type": "application/json",
+                        "X-Request-ID": request_id or "",
+                    },
+                )
+                # Raise for retryable server errors so _with_retry can back off
+                if resp.status_code in RETRYABLE_STATUS:
+                    resp.raise_for_status()
+                return resp
+
+            response = await _with_retry("get_profile", _fetch)
             
             duration_ms = (time.time() - start_time) * 1000
             
@@ -118,6 +180,13 @@ class ProfileService:
             response.raise_for_status()
             
             data = response.json()
+            # Strict validation via Pydantic model (rejects unexpected shapes)
+            if not isinstance(data, dict):
+                logger.error("Profile API returned non-object JSON", {
+                    "request_id": request_id,
+                    "type": type(data).__name__,
+                })
+                return None
             profile = UserProfile(**data)
             
             logger.end_operation("ProfileService.get_profile", duration_ms, {

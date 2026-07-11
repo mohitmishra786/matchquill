@@ -351,23 +351,36 @@ class PDFGenerator:
         Raises:
             ValueError: If generated PDF exceeds max_pages
         """
-        # Generate PDF
-        html_doc = HTML(string=html_content)
-        css = CSS(string=BASE_CSS, font_config=self.font_config)
-        
+        # Generate PDF with explicit resource cleanup
         pdf_buffer = BytesIO()
-        document = html_doc.render(stylesheets=[css], font_config=self.font_config)
-        
-        # Check page count
-        if len(document.pages) > max_pages:
-            raise ValueError(
-                f"Resume exceeds {max_pages} page(s). "
-                f"Generated {len(document.pages)} pages. "
-                "Consider reducing content or using a more compact template."
-            )
-        
-        document.write_pdf(pdf_buffer)
-        return pdf_buffer.getvalue()
+        document = None
+        try:
+            html_doc = HTML(string=html_content)
+            css = CSS(string=BASE_CSS, font_config=self.font_config)
+            document = html_doc.render(stylesheets=[css], font_config=self.font_config)
+
+            # Check page count
+            if len(document.pages) > max_pages:
+                raise ValueError(
+                    f"Resume exceeds {max_pages} page(s). "
+                    f"Generated {len(document.pages)} pages. "
+                    "Consider reducing content or using a more compact template."
+                )
+
+            document.write_pdf(pdf_buffer)
+            return pdf_buffer.getvalue()
+        finally:
+            # Free WeasyPrint document pages / buffers promptly under load
+            if document is not None:
+                try:
+                    document.pages.clear()  # type: ignore[attr-defined]
+                except Exception:
+                    # pages may be immutable or already released on some WeasyPrint versions
+                    logger.debug(
+                        "[PDFGenerator] Document page cleanup skipped",
+                        {"reason": "pages.clear unavailable or failed"},
+                    )
+            pdf_buffer.seek(0)
     
     async def generate_pdf(
         self,

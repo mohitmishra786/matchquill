@@ -3,7 +3,7 @@
  * Styled input field with label and error support
  */
 
-import { forwardRef, InputHTMLAttributes } from 'react';
+import { forwardRef, InputHTMLAttributes, useId } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
     label?: string;
@@ -13,7 +13,16 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
     ({ className = '', label, error, helperText, id, ...props }, ref) => {
-        const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+        const generatedId = useId();
+        const inputId = id || generatedId;
+        const errorId = `${inputId}-error`;
+        const helperId = `${inputId}-helper`;
+        const describedBy = [
+            error ? errorId : null,
+            helperText && !error ? helperId : null,
+        ]
+            .filter(Boolean)
+            .join(' ') || undefined;
 
         return (
             <div className="w-full">
@@ -25,6 +34,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                 <input
                     ref={ref}
                     id={inputId}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={describedBy}
                     className={`
             w-full px-4 py-3 border rounded-xl outline-none transition-shadow
             ${error
@@ -35,8 +46,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           `}
                     {...props}
                 />
-                {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-                {helperText && !error && <p className="mt-1 text-xs text-gray-500">{helperText}</p>}
+                {error && (
+                    <p id={errorId} className="mt-1 text-sm text-red-600" role="alert" aria-live="assertive">
+                        {error}
+                    </p>
+                )}
+                {helperText && !error && (
+                    <p id={helperId} className="mt-1 text-xs text-gray-600">
+                        {helperText}
+                    </p>
+                )}
             </div>
         );
     }

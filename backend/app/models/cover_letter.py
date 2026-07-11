@@ -10,10 +10,14 @@ from pydantic import BaseModel, Field
 class CoverLetterRequest(BaseModel):
     """Request body for cover letter generation endpoint."""
     
-    auth_token: str = Field(
-        ...,
-        description="JWT auth token from NextAuth",
-        alias="authToken"
+    auth_token: Optional[str] = Field(
+        default=None,
+        description=(
+            "DEPRECATED: Prefer Authorization: Bearer <token> header. "
+            "Body authToken is accepted for backward compatibility only."
+        ),
+        alias="authToken",
+        deprecated=True,
     )
     job_description: str = Field(
         ...,

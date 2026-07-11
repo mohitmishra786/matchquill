@@ -4,8 +4,15 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
+  // Tree-shake heavy icon/util packages and keep client bundles lean
   experimental: {
-    // serverActions: true, // No longer needed in Next.js 15
+    optimizePackageImports: [
+      'lucide-react',
+      '@radix-ui/react-icons',
+      'date-fns',
+      'lodash',
+      'lodash-es',
+    ],
   },
   async rewrites() {
     return [

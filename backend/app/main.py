@@ -14,15 +14,16 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
 from app.utils.rate_limiter import apply_rate_limiting  # noqa: E402
+from app.middleware.asgi_security import SecurityHeadersASGIMiddleware  # noqa: E402
 from app.utils.redis_cache import redis_client  # noqa: E402
 from app.utils.csrf_protection import CSRFProtectionMiddleware  # noqa: E402
 from app.utils.logger import (  # noqa: E402
-    logger, 
-    generate_request_id, 
-    set_request_context, 
+    logger,
+    generate_request_id,
+    set_request_context,
     clear_request_context,
     log_api_request,
-    sanitize_query_params
+    sanitize_query_params,
 )
 
 # Initialize Sentry
@@ -50,52 +51,69 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware to log all requests with timing and correlation IDs"""
-    
+    """
+    Middleware to log all requests with timing and correlation IDs.
+
+    SECURITY: Never logs Authorization headers, cookies, tokens, or auth bodies.
+    Query params are sanitized; request bodies are never logged here.
+    """
+
     async def dispatch(self, request: Request, call_next):
-        # Generate or extract request ID
+        # Generate or extract request ID (safe header — not auth)
         request_id = request.headers.get("x-request-id") or generate_request_id()
-        
+
         # Set request context for logging
         set_request_context(request_id=request_id)
-        
-        # Log request start
+
+        # Log request metadata only — never raw user-controlled header/query values
+        # (CodeQL log-injection: path/method/UA from the client must not be interpolated)
         sanitized_query = sanitize_query_params(request.query_params)
-        logger.info(f"[REQUEST] {request.method} {request.url.path}", {
-            "method": request.method,
-            "path": request.url.path,
+        # CodeQL-recognized sanitization for log injection: strip CR/LF
+        raw_path = request.url.path or ""
+        safe_path = (
+            raw_path.replace("\r\n", "").replace("\n", "").replace("\r", "")
+        )[:200]
+        method = request.method if request.method in {
+            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"
+        } else "OTHER"
+        logger.info("[REQUEST]", {
+            "method": method,
+            "path": safe_path,
             "query": sanitized_query,
             "client_ip": request.client.host if request.client else None,
-            "user_agent": request.headers.get("user-agent", "")[:100],
+            "has_authorization": "authorization" in request.headers,
+            "has_cookie": "cookie" in request.headers,
+            "has_user_agent": bool(request.headers.get("user-agent")),
         })
-        
+
         start_time = time.time()
-        
+
         try:
             response = await call_next(request)
             duration_ms = (time.time() - start_time) * 1000
-            
+
             # Add request ID to response headers
             response.headers["x-request-id"] = request_id
-            
-            # Log response
+
+            # Log response with already-sanitized method/path (no raw user input)
             log_api_request(
-                request.method, 
-                request.url.path, 
-                response.status_code, 
-                duration_ms
+                method,
+                safe_path,
+                response.status_code,
+                duration_ms,
             )
-            
+
             return response
-            
+
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
-            logger.error(f"[REQUEST ERROR] {request.method} {request.url.path}", {
-                "method": request.method,
-                "path": request.url.path,
+            # Never include request headers/body in error logs
+            logger.error("[REQUEST ERROR]", {
+                "method": method,
+                "path": safe_path,
                 "duration_ms": round(duration_ms, 2),
                 "error_type": type(e).__name__,
-                "error_message": str(e),
+                # Exception type only — message may contain request data
             }, exc_info=True)
             raise
         finally:
@@ -114,6 +132,17 @@ async def lifespan(app: FastAPI):
         "redis_url": "configured" if settings.redis_url else "NOT SET",
         "upstash_rest_url": "configured" if settings.upstash_redis_rest_url else "not set",
     })
+
+    # Schedule audit log retention cleanup (no-op until DB wiring is complete)
+    try:
+        from app.services.audit_retention import get_audit_retention_service
+        retention = get_audit_retention_service()
+        logger.info(
+            "[STARTUP] Audit retention service ready",
+            {"retention_days": retention.retention_days},
+        )
+    except Exception as e:
+        logger.warning("[STARTUP] Audit retention init skipped", {"error": str(e)})
     
     yield
     
@@ -128,12 +157,18 @@ async def lifespan(app: FastAPI):
 
 
 
+# Disable interactive API docs in production (CSP-safe; reduces attack surface)
+_is_prod = (get_settings().environment or "").lower() in ("production", "prod")
+
 app = FastAPI(
     title="CV-Wiz API",
     description="Career Resume Compiler - Generate tailored resumes and cover letters",
     version="1.0.0",
     lifespan=lifespan,
     root_path="/api/py",  # For Vercel deployment with Next.js rewrites
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
 )
 
 # Initialize rate limiting BEFORE importing routers
@@ -144,7 +179,8 @@ from app.routers import compile, cover_letter, upload, ai  # noqa: E402
 
 # Add logging middleware FIRST
 app.add_middleware(LoggingMiddleware)
-app.add_middleware(SecurityMiddleware)
+# Pure ASGI security headers (avoids BaseHTTPMiddleware overhead)
+app.add_middleware(SecurityHeadersASGIMiddleware)
 
 # Add CSRF protection middleware
 # Exempt health check and auth-related endpoints

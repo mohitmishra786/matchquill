@@ -78,6 +78,9 @@ def test_rate_limit_config_limits():
     assert hasattr(RateLimitConfig, 'GET_TEMPLATES')
     assert hasattr(RateLimitConfig, 'HEALTH_CHECK')
     assert hasattr(RateLimitConfig, 'UPLOAD_RESUME')
+    assert hasattr(RateLimitConfig, 'AI_ENHANCE_BULLET')
+    assert hasattr(RateLimitConfig, 'AI_INTERVIEW_PREP')
+    assert hasattr(RateLimitConfig, 'AI_SUGGEST_SKILLS')
     
     # Test that limits are in expected format
     assert RateLimitConfig.COMPILE_RESUME == ["5/minute", "30/hour"]

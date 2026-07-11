@@ -25,10 +25,13 @@ import GitHubImportModal from '@/components/GitHubImportModal';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileTabs } from '@/components/profile/ProfileTabs';
 import { ExperienceList, ProjectList, SkillList, EducationList } from '@/components/profile/ProfileLists';
+import { applyOptimisticItemUpdate } from '@/lib/profile-optimistic';
 
 const logger = createLogger({ component: 'ProfilePage' });
 
 type ModalType = 'profile' | 'experience' | 'project' | 'skill' | 'education' | 'upload' | null;
+
+type ProfileCollectionKey = 'experiences' | 'projects' | 'skills' | 'educations';
 
 export default function ProfilePage() {
     const { data: session, status } = useSession();
@@ -96,9 +99,13 @@ export default function ProfilePage() {
         setEditingItem(null);
     }, []);
 
-    // Generic save handler factory
+    /**
+     * Generic save handler: optimistically merges the API response into local state.
+     * Refetches only when the response payload is missing or unusable.
+     */
     const createSaveHandler = useCallback((
         endpoint: string,
+        collectionKey: ProfileCollectionKey,
         operationName: string,
         successMessage: string,
         updateMessage: string
@@ -106,9 +113,10 @@ export default function ProfilePage() {
         return async (data: Record<string, unknown>) => {
             logger.startOperation(`ProfilePage:${operationName}`);
             try {
-                const method = editingItem?.id ? 'PUT' : 'POST';
-                const url = editingItem?.id
-                    ? `/api/profile/${endpoint}?id=${editingItem.id}`
+                const editingId = editingItem?.id;
+                const method = editingId ? 'PUT' : 'POST';
+                const url = editingId
+                    ? `/api/profile/${endpoint}?id=${editingId}`
                     : `/api/profile/${endpoint}`;
 
                 const response = await fetch(url, {
@@ -117,38 +125,64 @@ export default function ProfilePage() {
                     body: JSON.stringify(data),
                 });
 
-                if (response.ok) {
-                    logger.info(`[ProfilePage] ${operationName} saved successfully`);
-                    logger.endOperation(`ProfilePage:${operationName}`);
-                    success(editingItem?.id ? updateMessage : successMessage);
-                    closeModal();
-                    await fetchProfile();
-                } else {
+                if (!response.ok) {
                     throw new Error(`Failed to save ${operationName.toLowerCase()}`);
                 }
+
+                const body = await response.json().catch(() => ({}));
+                const saved = (body?.data ?? body) as { id?: string } | undefined;
+
+                if (saved && typeof saved === 'object' && saved.id) {
+                    setProfile((prev) => {
+                        if (!prev) return prev;
+                        return {
+                            ...prev,
+                            [collectionKey]: applyOptimisticItemUpdate(
+                                prev[collectionKey] as Array<{ id: string }>,
+                                saved as { id: string },
+                                editingId
+                            ),
+                        };
+                    });
+                    logger.info(`[ProfilePage] ${operationName} saved optimistically`, { id: saved.id });
+                } else {
+                    // Fallback when API does not return the entity
+                    logger.warn(`[ProfilePage] ${operationName} missing entity in response; refetching`);
+                    await fetchProfile();
+                }
+
+                logger.endOperation(`ProfilePage:${operationName}`);
+                success(editingId ? updateMessage : successMessage);
+                closeModal();
             } catch (error) {
                 logger.failOperation(`ProfilePage:${operationName}`, error);
                 toastError(`Failed to save ${operationName.toLowerCase()}. Please try again.`);
+                // Re-sync after failure so UI matches server
+                try {
+                    await fetchProfile();
+                } catch {
+                    /* already logged via toast */
+                }
                 throw error;
             }
         };
     }, [editingItem, success, closeModal, fetchProfile, toastError]);
 
     // Handlers using the factory
-    const handleExperienceSubmit = useMemo(() => 
-        createSaveHandler('experiences', 'saveExperience', 'Experience added successfully', 'Experience updated successfully'),
+    const handleExperienceSubmit = useMemo(() =>
+        createSaveHandler('experiences', 'experiences', 'saveExperience', 'Experience added successfully', 'Experience updated successfully'),
     [createSaveHandler]);
 
-    const handleProjectSubmit = useMemo(() => 
-        createSaveHandler('projects', 'saveProject', 'Project added successfully', 'Project updated successfully'),
+    const handleProjectSubmit = useMemo(() =>
+        createSaveHandler('projects', 'projects', 'saveProject', 'Project added successfully', 'Project updated successfully'),
     [createSaveHandler]);
 
-    const handleSkillSubmit = useMemo(() => 
-        createSaveHandler('skills', 'saveSkill', 'Skill added successfully', 'Skill updated successfully'),
+    const handleSkillSubmit = useMemo(() =>
+        createSaveHandler('skills', 'skills', 'saveSkill', 'Skill added successfully', 'Skill updated successfully'),
     [createSaveHandler]);
 
-    const handleEducationSubmit = useMemo(() => 
-        createSaveHandler('educations', 'saveEducation', 'Education added successfully', 'Education updated successfully'),
+    const handleEducationSubmit = useMemo(() =>
+        createSaveHandler('educations', 'educations', 'saveEducation', 'Education added successfully', 'Education updated successfully'),
     [createSaveHandler]);
 
     const handleProfileSubmit = useCallback(async (data: { name: string; image?: string }) => {
@@ -160,18 +194,33 @@ export default function ProfilePage() {
                 body: JSON.stringify(data),
             });
 
-            if (response.ok) {
-                logger.info('[ProfilePage] Profile updated successfully');
-                logger.endOperation('ProfilePage:saveProfile');
-                success('Profile updated successfully');
-                closeModal();
-                await fetchProfile();
-            } else {
+            if (!response.ok) {
                 throw new Error('Failed to update profile');
             }
+
+            // Optimistic local update — no full refetch needed
+            setProfile((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          name: data.name,
+                          image: data.image ?? prev.image,
+                      }
+                    : prev
+            );
+
+            logger.info('[ProfilePage] Profile updated optimistically');
+            logger.endOperation('ProfilePage:saveProfile');
+            success('Profile updated successfully');
+            closeModal();
         } catch (error) {
             logger.failOperation('ProfilePage:saveProfile', error);
             toastError('Failed to update profile. Please try again.');
+            try {
+                await fetchProfile();
+            } catch {
+                /* already toasted */
+            }
             throw error;
         }
     }, [success, closeModal, fetchProfile, toastError]);
@@ -187,28 +236,72 @@ export default function ProfilePage() {
         });
         success('Resume uploaded and parsed successfully!');
         closeModal();
+        // Resume upload mutates many collections server-side; full refetch is necessary
         await fetchProfile();
     }, [success, closeModal, fetchProfile]);
 
     const handleGitHubImport = useCallback(async (projects: Partial<Project>[]) => {
         logger.startOperation('ProfilePage:importGitHub');
         try {
-            await Promise.all(
-                projects.map(project =>
-                    fetch('/api/profile/projects', {
+            // allSettled keeps successful imports when individual POSTs fail
+            const settled = await Promise.allSettled(
+                projects.map(async (project) => {
+                    const response = await fetch('/api/profile/projects', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(project),
-                    })
-                )
+                    });
+                    if (!response.ok) {
+                        throw new Error(`Failed to import project (${response.status})`);
+                    }
+                    const body = await response.json().catch(() => ({}));
+                    return (body?.data ?? body) as Project | undefined;
+                })
             );
-            logger.info('[ProfilePage] GitHub projects imported');
+
+            const imported = settled
+                .filter((r): r is PromiseFulfilledResult<Project | undefined> => r.status === 'fulfilled')
+                .map((r) => r.value)
+                .filter((p): p is Project => !!p && typeof p === 'object' && !!p.id);
+
+            const failedCount = settled.filter((r) => r.status === 'rejected').length;
+
+            if (imported.length > 0) {
+                setProfile((prev) => {
+                    if (!prev) return prev;
+                    const existing = prev.projects ?? [];
+                    const existingIds = new Set(existing.map((p) => p.id));
+                    const newOnes = imported.filter((p) => !existingIds.has(p.id));
+                    return {
+                        ...prev,
+                        projects: [...newOnes, ...existing],
+                    };
+                });
+            } else {
+                // Nothing imported successfully — re-sync from server
+                await fetchProfile();
+            }
+
+            logger.info('[ProfilePage] GitHub projects imported', {
+                count: imported.length,
+                failed: failedCount,
+            });
             logger.endOperation('ProfilePage:importGitHub');
-            success(`${projects.length} projects imported successfully`);
-            await fetchProfile();
+            if (failedCount === 0) {
+                success(`${imported.length} projects imported successfully`);
+            } else if (imported.length > 0) {
+                success(`${imported.length} imported; ${failedCount} failed`);
+            } else {
+                toastError('Failed to import projects');
+            }
         } catch (error) {
             logger.failOperation('ProfilePage:importGitHub', error);
             toastError('Failed to import some projects');
+            try {
+                await fetchProfile();
+            } catch {
+                /* already toasted */
+            }
         }
     }, [success, fetchProfile, toastError]);
 

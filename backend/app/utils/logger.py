@@ -5,6 +5,7 @@ Provides structured logging with request correlation IDs for debugging
 
 import logging
 import json
+import re
 import sys
 import uuid
 import time
@@ -18,13 +19,153 @@ request_id_var: ContextVar[str] = ContextVar('request_id', default='')
 user_id_var: ContextVar[str] = ContextVar('user_id', default='')
 session_id_var: ContextVar[str] = ContextVar('session_id', default='')
 
-# Standard set of sensitive keys to mask in logs
+# Standard set of sensitive keys to mask in logs (exact match after normalize)
 DEFAULT_SENSITIVE_KEYS: set = {
     "password", "passwd", "secret", "token", "api_key", "apikey", "api-key",
-    "access_token", "refresh_token", "auth_token", "authorization",
+    "access_token", "refresh_token", "auth_token", "authtoken", "authorization",
     "jwt", "key", "private_key", "secret_key",
     "session_id", "csrf_token", "otp", "pin", "ssn",
+    "cookie", "cookies", "set_cookie", "set-cookie",
+    "x_api_key", "x-api-key", "bearer",
 }
+
+# Substrings that mark a key as sensitive (covers camelCase like authToken, cookieHeader)
+_SENSITIVE_KEY_SUBSTRINGS: tuple = (
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "authorization",
+    "cookie",
+    "api_key",
+    "apikey",
+    "private_key",
+    "csrf",
+    "session",
+    "jwt",
+    "bearer",
+)
+
+
+def is_sensitive_key(key: str, sensitive_keys: Optional[set] = None) -> bool:
+    """
+    Return True if a key name should be redacted in logs.
+
+    Matches exact normalized names and common sensitive substrings so
+    variants like authToken, Cookie, Authorization are covered.
+
+    Custom ``sensitive_keys`` are *additive* to built-in exact and substring rules.
+    """
+    if not key:
+        return False
+    key_lower = key.lower()
+    key_norm = key_lower.replace("-", "_")
+
+    # Built-in exact matches always apply
+    if key_lower in DEFAULT_SENSITIVE_KEYS or key_norm in DEFAULT_SENSITIVE_KEYS:
+        return True
+
+    # Optional custom keys are additive (exact match only for the custom set)
+    if sensitive_keys is not None:
+        if key_lower in sensitive_keys or key_norm in sensitive_keys:
+            return True
+
+    # Built-in substring rules still apply (password/token/cookie variants)
+    for sub in _SENSITIVE_KEY_SUBSTRINGS:
+        if sub in key_norm or sub in key_lower:
+            return True
+    return False
+
+
+# Allowlisted request headers that may be reflected in logs (values still scrubbed).
+# Anything not in this set is omitted entirely — never log arbitrary user-controlled keys.
+_LOGGABLE_HEADER_NAMES: frozenset = frozenset({
+    "user-agent",
+    "content-type",
+    "content-length",
+    "accept",
+    "accept-language",
+    "x-request-id",
+    "x-forwarded-for",
+    "host",
+})
+
+
+def _safe_log_key(key: str) -> str:
+    """
+    Normalize a user-influenced key for safe structured logging.
+
+    Strips control characters and non-printable content to prevent log injection
+    via crafted header names (CodeQL: log-injection).
+    """
+    # Collapse to a conservative identifier alphabet only
+    cleaned = re.sub(r"[^A-Za-z0-9_.\-]", "_", str(key))
+    cleaned = cleaned[:64] if cleaned else "unknown"
+    return cleaned or "unknown"
+
+
+def _safe_log_value(value: Any, *, max_len: int = 100) -> str:
+    """
+    Coerce values to a single-line, length-capped string for logs.
+
+    CodeQL py/log-injection recognizes str.replace of CR/LF as a sanitizer
+    (see https://codeql.github.com/codeql-query-help/python/py-log-injection/).
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)[:max_len]
+
+    # Only accept real strings; do not str() arbitrary objects from requests
+    if not isinstance(value, str):
+        return ""
+
+    # Official CodeQL-recognized sanitization: strip line breaks before logging
+    cleaned = (
+        value.replace("\r\n", "")
+        .replace("\n", "")
+        .replace("\r", "")
+        .replace("\x00", "")
+    )
+    if len(cleaned) > max_len:
+        cleaned = cleaned[:max_len]
+    return cleaned
+
+
+def sanitize_headers(headers: Any) -> Optional[Dict[str, str]]:
+    """
+    Sanitize HTTP headers for safe logging.
+
+    Never logs raw header values from the client. Only fixed keys with
+    presence flags (or lengths) are emitted — eliminates log-injection
+    from user-controlled User-Agent / custom headers.
+    """
+    if not headers:
+        return None
+
+    try:
+        items = dict(headers).items()
+    except (TypeError, ValueError):
+        return None
+
+    lower_keys = {str(key).lower() for key, _ in items}
+
+    sanitized: Dict[str, str] = {}
+
+    # Presence-only flags — never echo values
+    if any(k in lower_keys for k in ("authorization", "proxy-authorization")):
+        sanitized["has_authorization"] = "true"
+    if any(k in lower_keys for k in ("cookie", "set-cookie")):
+        sanitized["has_cookie"] = "true"
+
+    for name in _LOGGABLE_HEADER_NAMES:
+        if name in lower_keys:
+            # Presence only — do not log raw User-Agent / Host content
+            sanitized[f"has_{name.replace('-', '_')}"] = "true"
+
+    return sanitized if sanitized else None
 
 
 class StructuredFormatter(logging.Formatter):
@@ -169,11 +310,17 @@ def log_function_call(func):
         func_name = f"{func.__module__}.{func.__name__}"
         start_time = time.time()
         
-        # Mask sensitive data in kwargs
-        safe_kwargs = {k: "***" if k in ("password", "token", "secret", "api_key") else v 
-                       for k, v in kwargs.items()}
+        # Mask sensitive data in kwargs (never log tokens/passwords/auth bodies)
+        safe_kwargs = {
+            k: "***" if is_sensitive_key(k) else v
+            for k, v in kwargs.items()
+        }
         
-        logger.debug(f"Calling {func_name}", {"args_count": len(args), "kwargs": list(safe_kwargs.keys())})
+        logger.debug(f"Calling {func_name}", {
+            "args_count": len(args),
+            "kwargs": list(safe_kwargs.keys()),
+            "kwargs_redacted": sanitize_dict(safe_kwargs) if safe_kwargs else None,
+        })
         
         try:
             result = await func(*args, **kwargs)
@@ -194,11 +341,17 @@ def log_function_call(func):
         func_name = f"{func.__module__}.{func.__name__}"
         start_time = time.time()
         
-        # Mask sensitive data in kwargs
-        safe_kwargs = {k: "***" if k in ("password", "token", "secret", "api_key") else v 
-                       for k, v in kwargs.items()}
+        # Mask sensitive data in kwargs (never log tokens/passwords/auth bodies)
+        safe_kwargs = {
+            k: "***" if is_sensitive_key(k) else v
+            for k, v in kwargs.items()
+        }
         
-        logger.debug(f"Calling {func_name}", {"args_count": len(args), "kwargs": list(safe_kwargs.keys())})
+        logger.debug(f"Calling {func_name}", {
+            "args_count": len(args),
+            "kwargs": list(safe_kwargs.keys()),
+            "kwargs_redacted": sanitize_dict(safe_kwargs) if safe_kwargs else None,
+        })
         
         try:
             result = func(*args, **kwargs)
@@ -227,16 +380,30 @@ def log_db_operation(operation: str, table: str, data: Optional[Dict[str, Any]] 
 
 
 def log_api_request(method: str, path: str, status_code: int, duration_ms: float, data: Optional[Dict[str, Any]] = None):
-    """Log API requests"""
+    """Log API requests.
+
+    ``path`` may be request-derived; strip line breaks (CodeQL py/log-injection)
+    before it is written to a log entry.
+    """
+    # CodeQL-recognized sanitizer: remove CR/LF from untrusted path segments
+    safe_path = (
+        (path or "")
+        .replace("\r\n", "")
+        .replace("\n", "")
+        .replace("\r", "")
+    )[:200]
+    allowed_methods = {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}
+    safe_method = method if method in allowed_methods else "OTHER"
     log_data = {
-        "method": method,
-        "path": path,
+        "method": safe_method,
+        "path": safe_path,
         "status_code": status_code,
         "duration_ms": round(duration_ms, 2),
         **(data or {})
     }
     level = logging.ERROR if status_code >= 500 else logging.WARNING if status_code >= 400 else logging.INFO
-    logger._log(level, f"[API] {method} {path} -> {status_code}", log_data)
+    # Keep message static; put user-derived fields only in structured data
+    logger._log(level, "[API] request completed", log_data)
 
 
 def log_llm_request(model: str, operation: str, tokens_in: int = 0, tokens_out: int = 0, duration_ms: float = 0, data: Optional[Dict[str, Any]] = None):
@@ -281,7 +448,8 @@ def sanitize_query_params(query_params: Any) -> Optional[Dict[str, str]]:
     """
     Sanitize query parameters by removing sensitive data.
     
-    Masks passwords, tokens, API keys, and other sensitive parameters.
+    Masks passwords, tokens, API keys, cookies, authorization, and other
+    sensitive parameters. Never logs raw auth credentials.
     
     Args:
         query_params: Query parameters from FastAPI request
@@ -292,18 +460,16 @@ def sanitize_query_params(query_params: Any) -> Optional[Dict[str, str]]:
     if not query_params:
         return None
     
-    sanitized = {}
+    sanitized: Dict[str, str] = {}
     for key, value in dict(query_params).items():
-        # Mask sensitive keys
-        if key.lower() in DEFAULT_SENSITIVE_KEYS:
-            sanitized[key] = "***"
+        safe_key = _safe_log_key(str(key))
+        # Mask sensitive keys; for others only log length (not raw content)
+        if is_sensitive_key(str(key), None) or is_sensitive_key(safe_key, None):
+            sanitized[safe_key] = "***"
         else:
-            # For non-sensitive keys, still limit length
-            str_value = str(value)
-            if len(str_value) > 100:
-                sanitized[key] = str_value[:100] + "..."
-            else:
-                sanitized[key] = str_value
+            # Presence + length only — avoids log injection via query values
+            length = len(str(value)) if value is not None else 0
+            sanitized[safe_key] = f"<len={length}>"
     
     return sanitized if sanitized else None
 
@@ -312,28 +478,33 @@ def sanitize_dict(data: Dict[str, Any], sensitive_keys: Optional[set] = None) ->
     """
     Sanitize a dictionary by masking sensitive values.
     
+    Covers request bodies with authToken, password, cookie, authorization, etc.
+    Keys are normalized to block log-injection via crafted field names.
+    
     Args:
         data: Dictionary to sanitize
-        sensitive_keys: Set of sensitive key names (defaults to standard set)
+        sensitive_keys: Optional set of additional exact sensitive key names
         
     Returns:
         Sanitized dictionary
     """
-    if sensitive_keys is None:
-        sensitive_keys = DEFAULT_SENSITIVE_KEYS
-    
-    sanitized = {}
+    sanitized: Dict[str, Any] = {}
     for key, value in data.items():
-        if key.lower() in sensitive_keys:
-            sanitized[key] = "***"
+        safe_key = _safe_log_key(str(key))
+        if is_sensitive_key(str(key), sensitive_keys) or is_sensitive_key(safe_key, sensitive_keys):
+            sanitized[safe_key] = "***"
         elif isinstance(value, dict):
-            sanitized[key] = sanitize_dict(value, sensitive_keys)
+            sanitized[safe_key] = sanitize_dict(value, sensitive_keys)
         elif isinstance(value, list):
-            sanitized[key] = [
+            sanitized[safe_key] = [
                 sanitize_dict(item, sensitive_keys) if isinstance(item, dict) else item
                 for item in value
             ]
         else:
-            sanitized[key] = value
+            # Scalar values: keep type when safe, coerce strings to single-line
+            if isinstance(value, str):
+                sanitized[safe_key] = _safe_log_value(value, max_len=500)
+            else:
+                sanitized[safe_key] = value
     
     return sanitized

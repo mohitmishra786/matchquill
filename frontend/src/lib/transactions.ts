@@ -141,8 +141,8 @@ export async function updateProfileWithSettings(
 }
 
 /**
- * Create multiple experiences in a single transaction
- * Useful for bulk imports
+ * Create multiple experiences in a single transaction.
+ * Uses createManyAndReturn to avoid N+1 round-trips (one query, not N).
  */
 export async function createExperiencesBatch(
     userId: string,
@@ -158,34 +158,32 @@ export async function createExperiencesBatch(
         keywords?: string[];
     }>
 ) {
+    if (experiences.length === 0) {
+        return [];
+    }
+
     return withTransaction(async (tx) => {
-        const created = [];
-        
-        for (const exp of experiences) {
-            const experience = await tx.experience.create({
-                data: {
-                    userId,
-                    company: exp.company,
-                    title: exp.title,
-                    location: exp.location || null,
-                    startDate: exp.startDate,
-                    endDate: exp.endDate || null,
-                    current: exp.current || false,
-                    description: exp.description,
-                    highlights: exp.highlights || [],
-                    keywords: exp.keywords || [],
-                },
-            });
-            created.push(experience);
-        }
-        
-        return created;
+        // Single batched insert — avoids N sequential create() round-trips
+        return tx.experience.createManyAndReturn({
+            data: experiences.map((exp) => ({
+                userId,
+                company: exp.company,
+                title: exp.title,
+                location: exp.location || null,
+                startDate: exp.startDate,
+                endDate: exp.endDate || null,
+                current: exp.current || false,
+                description: exp.description,
+                highlights: exp.highlights || [],
+                keywords: exp.keywords || [],
+            })),
+        });
     });
 }
 
 /**
- * Create multiple skills in a single transaction
- * Checks for duplicates within the transaction
+ * Create multiple skills in a single transaction.
+ * Checks for duplicates within the transaction, then batch-inserts new skills.
  */
 export async function createSkillsBatch(
     userId: string,
@@ -196,43 +194,57 @@ export async function createSkillsBatch(
         yearsExp?: number;
     }>
 ) {
+    // Avoid opening a transaction for empty batch imports
+    if (skills.length === 0) {
+        return { created: [], duplicates: [] as string[] };
+    }
+
     return withTransaction(async (tx) => {
-        // Get existing skills for this user
+        // Get existing skills for this user (one query)
         const existingSkills = await tx.skill.findMany({
             where: { userId },
             select: { name: true },
         });
-        const existingNames = new Set(existingSkills.map(s => s.name.toLowerCase()));
-        
-        const created = [];
-        const duplicates = [];
-        
+        const existingNames = new Set(existingSkills.map((s) => s.name.toLowerCase()));
+
+        const duplicates: string[] = [];
+        const toCreate: Array<{
+            userId: string;
+            name: string;
+            category: string;
+            proficiency: string | null;
+            yearsExp: number | null;
+        }> = [];
+        // De-dupe within the payload itself (case-insensitive)
+        const seenInBatch = new Set<string>();
+
         for (const skill of skills) {
-            // Check for duplicates (case-insensitive)
-            if (existingNames.has(skill.name.toLowerCase())) {
+            const key = skill.name.toLowerCase();
+            if (existingNames.has(key) || seenInBatch.has(key)) {
                 duplicates.push(skill.name);
                 continue;
             }
-            
-            const createdSkill = await tx.skill.create({
-                data: {
-                    userId,
-                    name: skill.name,
-                    category: skill.category,
-                    proficiency: skill.proficiency || null,
-                    yearsExp: skill.yearsExp || null,
-                },
+            seenInBatch.add(key);
+            toCreate.push({
+                userId,
+                name: skill.name,
+                category: skill.category,
+                proficiency: skill.proficiency || null,
+                yearsExp: skill.yearsExp ?? null,
             });
-            created.push(createdSkill);
-            existingNames.add(skill.name.toLowerCase());
         }
-        
+
+        const created =
+            toCreate.length === 0
+                ? []
+                : await tx.skill.createManyAndReturn({ data: toCreate });
+
         return { created, duplicates };
     });
 }
 
 /**
- * Create multiple educations in a single transaction
+ * Create multiple educations in a single transaction (batched insert).
  */
 export async function createEducationsBatch(
     userId: string,
@@ -246,31 +258,28 @@ export async function createEducationsBatch(
         honors?: string[];
     }>
 ) {
+    if (educations.length === 0) {
+        return [];
+    }
+
     return withTransaction(async (tx) => {
-        const created = [];
-        
-        for (const edu of educations) {
-            const education = await tx.education.create({
-                data: {
-                    userId,
-                    institution: edu.institution,
-                    degree: edu.degree,
-                    field: edu.field,
-                    startDate: edu.startDate,
-                    endDate: edu.endDate || null,
-                    gpa: edu.gpa || null,
-                    honors: edu.honors || [],
-                },
-            });
-            created.push(education);
-        }
-        
-        return created;
+        return tx.education.createManyAndReturn({
+            data: educations.map((edu) => ({
+                userId,
+                institution: edu.institution,
+                degree: edu.degree,
+                field: edu.field,
+                startDate: edu.startDate,
+                endDate: edu.endDate || null,
+                gpa: edu.gpa ?? null,
+                honors: edu.honors || [],
+            })),
+        });
     });
 }
 
 /**
- * Create multiple projects in a single transaction
+ * Create multiple projects in a single transaction (batched insert).
  */
 export async function createProjectsBatch(
     userId: string,
@@ -284,26 +293,23 @@ export async function createProjectsBatch(
         highlights?: string[];
     }>
 ) {
+    if (projects.length === 0) {
+        return [];
+    }
+
     return withTransaction(async (tx) => {
-        const created = [];
-        
-        for (const proj of projects) {
-            const project = await tx.project.create({
-                data: {
-                    userId,
-                    name: proj.name,
-                    description: proj.description,
-                    url: proj.url || null,
-                    startDate: proj.startDate || null,
-                    endDate: proj.endDate || null,
-                    technologies: proj.technologies || [],
-                    highlights: proj.highlights || [],
-                },
-            });
-            created.push(project);
-        }
-        
-        return created;
+        return tx.project.createManyAndReturn({
+            data: projects.map((proj) => ({
+                userId,
+                name: proj.name,
+                description: proj.description,
+                url: proj.url || null,
+                startDate: proj.startDate || null,
+                endDate: proj.endDate || null,
+                technologies: proj.technologies || [],
+                highlights: proj.highlights || [],
+            })),
+        });
     });
 }
 
@@ -394,91 +400,93 @@ export async function importCompleteProfile(
             });
         }
 
-        // Create experiences
+        // Create experiences (single batched insert)
         if (data.experiences?.length) {
-            for (const exp of data.experiences) {
-                const experience = await tx.experience.create({
-                    data: {
-                        userId,
-                        company: exp.company,
-                        title: exp.title,
-                        location: exp.location || null,
-                        startDate: exp.startDate,
-                        endDate: exp.endDate || null,
-                        current: exp.current || false,
-                        description: exp.description,
-                        highlights: exp.highlights || [],
-                        keywords: exp.keywords || [],
-                    },
-                });
-                results.experiences.push(experience);
-            }
+            results.experiences = await tx.experience.createManyAndReturn({
+                data: data.experiences.map((exp) => ({
+                    userId,
+                    company: exp.company,
+                    title: exp.title,
+                    location: exp.location || null,
+                    startDate: exp.startDate,
+                    endDate: exp.endDate || null,
+                    current: exp.current || false,
+                    description: exp.description,
+                    highlights: exp.highlights || [],
+                    keywords: exp.keywords || [],
+                })),
+            });
         }
 
-        // Create educations
+        // Create educations (single batched insert)
         if (data.educations?.length) {
-            for (const edu of data.educations) {
-                const education = await tx.education.create({
-                    data: {
-                        userId,
-                        institution: edu.institution,
-                        degree: edu.degree,
-                        field: edu.field,
-                        startDate: edu.startDate,
-                        endDate: edu.endDate || null,
-                        gpa: edu.gpa || null,
-                        honors: edu.honors || [],
-                    },
-                });
-                results.educations.push(education);
-            }
+            results.educations = await tx.education.createManyAndReturn({
+                data: data.educations.map((edu) => ({
+                    userId,
+                    institution: edu.institution,
+                    degree: edu.degree,
+                    field: edu.field,
+                    startDate: edu.startDate,
+                    endDate: edu.endDate || null,
+                    gpa: edu.gpa ?? null,
+                    honors: edu.honors || [],
+                })),
+            });
         }
 
-        // Create skills with duplicate checking
+        // Create skills with duplicate checking, then one batch insert
         if (data.skills?.length) {
             const existingSkills = await tx.skill.findMany({
                 where: { userId },
                 select: { name: true },
             });
-            const existingNames = new Set(existingSkills.map(s => s.name.toLowerCase()));
+            const existingNames = new Set(existingSkills.map((s) => s.name.toLowerCase()));
+            const seenInBatch = new Set<string>();
+            const skillsToCreate: Array<{
+                userId: string;
+                name: string;
+                category: string;
+                proficiency: string | null;
+                yearsExp: number | null;
+            }> = [];
 
             for (const skill of data.skills) {
-                if (existingNames.has(skill.name.toLowerCase())) {
+                const key = skill.name.toLowerCase();
+                if (existingNames.has(key) || seenInBatch.has(key)) {
                     results.skills.duplicates.push(skill.name);
                     continue;
                 }
-
-                const createdSkill = await tx.skill.create({
-                    data: {
-                        userId,
-                        name: skill.name,
-                        category: skill.category,
-                        proficiency: skill.proficiency || null,
-                        yearsExp: skill.yearsExp || null,
-                    },
+                seenInBatch.add(key);
+                skillsToCreate.push({
+                    userId,
+                    name: skill.name,
+                    category: skill.category,
+                    proficiency: skill.proficiency || null,
+                    yearsExp: skill.yearsExp ?? null,
                 });
-                results.skills.created.push(createdSkill);
-                existingNames.add(skill.name.toLowerCase());
+            }
+
+            if (skillsToCreate.length > 0) {
+                results.skills.created = await tx.skill.createManyAndReturn({
+                    data: skillsToCreate,
+                });
             }
         }
 
-        // Create projects
+        // Create projects (single batched insert)
         if (data.projects?.length) {
-            for (const proj of data.projects) {
-                const project = await tx.project.create({
-                    data: {
-                        userId,
-                        name: proj.name,
-                        description: proj.description,
-                        url: proj.url || null,
-                        startDate: proj.startDate || null,
-                        endDate: proj.endDate || null,
-                        technologies: proj.technologies || [],
-                        highlights: proj.highlights || [],
-                    },
-                });
-                results.projects.push(project);
-            }
+            results.projects = await tx.project.createManyAndReturn({
+                data: data.projects.map((proj) => ({
+                    userId,
+                    name: proj.name,
+                    description: proj.description,
+                    url: proj.url || null,
+                    startDate: proj.startDate || null,
+                    endDate: proj.endDate || null,
+                    technologies: proj.technologies || [],
+                    highlights: proj.highlights || [],
+                })),
+            });
         }
 
         return results;

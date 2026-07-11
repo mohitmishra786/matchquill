@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { sanitizeText } from '@/lib/sanitization';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -13,6 +14,8 @@ export interface ToastProps {
 }
 
 export default function Toast({ id, message, type, duration = 3000, onDismiss }: ToastProps) {
+  // Sanitize user-provided / interpolated strings before display
+  const safeMessage = sanitizeText(message);
   const [isVisible, setIsVisible] = useState(false);
   const enterTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -85,7 +88,7 @@ export default function Toast({ id, message, type, duration = 3000, onDismiss }:
       <div className="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg bg-white/50">
         {icons[type]}
       </div>
-      <div className="ml-3 text-sm font-medium break-words">{message}</div>
+      <div className="ml-3 text-sm font-medium break-words">{safeMessage}</div>
       <button
         type="button"
         className={`ml-auto -mx-1.5 -my-1.5 rounded-lg p-1.5 inline-flex h-8 w-8 hover:bg-black/5 focus:ring-2 focus:ring-gray-300 transition-colors ${

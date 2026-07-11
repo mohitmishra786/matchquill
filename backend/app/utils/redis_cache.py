@@ -173,14 +173,37 @@ class RedisClient:
 redis_client = RedisClient()
 
 
+# Namespace prefix for all CV-Wiz cache keys (prevents collisions with other apps)
+CACHE_NAMESPACE = "cvwiz"
+# Secondary index sets track keys per user/prefix so invalidation avoids SCAN
+KEY_INDEX_PREFIX = f"{CACHE_NAMESPACE}:idx"
+
+
 def generate_cache_key(user_id: str, job_description: str, prefix: str = "resume") -> str:
     """
-    Generate a cache key based on user ID and job description hash.
-    This allows caching repeated requests for the same JD.
+    Generate a namespaced cache key based on user ID and job description hash.
+    Format: cvwiz:{prefix}:{user_id}:{jd_hash}
     """
     # Hash the job description to create a consistent key
     jd_hash = hashlib.sha256(job_description.encode()).hexdigest()[:16]
-    return f"cvwiz:{prefix}:{user_id}:{jd_hash}"
+    safe_user = user_id.replace(":", "_")
+    safe_prefix = prefix.replace(":", "_")
+    return f"{CACHE_NAMESPACE}:{safe_prefix}:{safe_user}:{jd_hash}"
+
+
+def _index_set_key(user_id: str, prefix: str = "resume") -> str:
+    """Redis set key that tracks all cache keys for a user+prefix."""
+    safe_user = user_id.replace(":", "_")
+    safe_prefix = prefix.replace(":", "_")
+    return f"{KEY_INDEX_PREFIX}:{safe_prefix}:{safe_user}"
+
+
+def parse_cache_key_parts(key: str) -> Optional[tuple]:
+    """Parse a cache key into (namespace, prefix, user_id, hash) or None."""
+    parts = key.split(":")
+    if len(parts) < 4 or parts[0] != CACHE_NAMESPACE:
+        return None
+    return parts[0], parts[1], parts[2], parts[3]
 
 
 async def get_cached(key: str) -> Optional[dict]:
@@ -215,6 +238,7 @@ async def get_cached(key: str) -> Optional[dict]:
 async def set_cached(key: str, value: Any, ttl: Optional[int] = None) -> bool:
     """
     Set cached value in Redis with optional TTL.
+    Also tracks the key in a per-user Redis SET for O(1) invalidation.
     
     Args:
         key: Cache key
@@ -235,12 +259,31 @@ async def set_cached(key: str, value: Any, ttl: Optional[int] = None) -> bool:
         if not client:
             return False
         
+        effective_ttl = ttl or settings.cache_ttl
         serialized = _json_dumps(value)
         await client.set(
             key,
             serialized,
-            ex=ttl or settings.cache_ttl,
+            ex=effective_ttl,
         )
+
+        # Track key in index set for SCAN-free invalidation
+        parts = parse_cache_key_parts(key)
+        if parts:
+            _, prefix, user_id, _ = parts
+            index_key = _index_set_key(user_id, prefix)
+            await client.sadd(index_key, key)
+            # Index set lives slightly longer than entries so cleanup can still find them.
+            # Never *shorten* an existing TTL — only extend when needed.
+            desired_ttl = int(effective_ttl) + 60
+            try:
+                current_ttl = await client.ttl(index_key)
+            except Exception:
+                current_ttl = -1
+            # ttl: -2 missing, -1 no expiry, >0 seconds remaining
+            if current_ttl is None or current_ttl < 0 or current_ttl < desired_ttl:
+                await client.expire(index_key, desired_ttl)
+
         redis_client.record_success()
         logger.debug("Cache set successfully", {"key": key[:50]})
         return True
@@ -250,9 +293,50 @@ async def set_cached(key: str, value: Any, ttl: Optional[int] = None) -> bool:
         return False
 
 
+async def invalidate_user_cache(user_id: str, prefix: str = "resume") -> int:
+    """
+    Invalidate all cache keys for a user using the set-based index (no SCAN).
+
+    Args:
+        user_id: User id embedded in cache keys
+        prefix: Cache prefix (resume, cover, etc.)
+
+    Returns:
+        Number of keys deleted
+    """
+    if not redis_client.is_available:
+        return 0
+    try:
+        client = await redis_client.get_client()
+        if not client:
+            return 0
+
+        index_key = _index_set_key(user_id, prefix)
+        keys = await client.smembers(index_key)
+        if not keys:
+            return 0
+
+        key_list = list(keys)
+        total_deleted = await client.delete(*key_list)
+        await client.delete(index_key)
+        redis_client.record_success()
+        logger.info(
+            "Cache invalidated via set index",
+            {"user_id": user_id, "prefix": prefix, "deleted": total_deleted},
+        )
+        return int(total_deleted)
+    except Exception as e:
+        redis_client.record_failure()
+        logger.error(f"Redis set-index invalidate error: {e}", {"user_id": user_id})
+        return 0
+
+
 async def invalidate_cache(pattern: str) -> int:
     """
-    Invalidate all cache entries matching a pattern in batches.
+    Invalidate cache entries matching a pattern.
+
+    Prefer set-based invalidation when pattern is cvwiz:{prefix}:{user_id}:*
+    Falls back to SCAN only for arbitrary patterns (legacy).
     
     Args:
         pattern: Redis key pattern (e.g., "cvwiz:resume:user123:*")
@@ -263,6 +347,18 @@ async def invalidate_cache(pattern: str) -> int:
     if not redis_client.is_available:
         logger.debug("Cache unavailable, skipping invalidate", {"pattern": pattern})
         return 0
+
+    # Fast path: cvwiz:{prefix}:{user}:*  → set-based invalidation
+    parts = pattern.rstrip("*").rstrip(":").split(":")
+    if (
+        len(parts) >= 3
+        and parts[0] == CACHE_NAMESPACE
+        and pattern.endswith("*")
+        and "*" not in pattern[:-1]
+    ):
+        prefix = parts[1]
+        user_id = parts[2]
+        return await invalidate_user_cache(user_id, prefix)
         
     try:
         client = await redis_client.get_client()

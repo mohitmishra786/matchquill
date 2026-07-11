@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import { isStrongPassword } from '@/lib/input-validation';
 
 // ============================================================================
 // Types
@@ -105,36 +106,8 @@ export function inRange(value: number, min: number, max: number): boolean {
     return value >= min && value <= max;
 }
 
-/**
- * Validate strong password
- */
-export function isStrongPassword(password: string): {
-    isValid: boolean;
-    errors: string[];
-} {
-    const errors: string[] = [];
-
-    if (password.length < 8) {
-        errors.push('Password must be at least 8 characters');
-    }
-    if (!/[A-Z]/.test(password)) {
-        errors.push('Password must contain at least one uppercase letter');
-    }
-    if (!/[a-z]/.test(password)) {
-        errors.push('Password must contain at least one lowercase letter');
-    }
-    if (!/[0-9]/.test(password)) {
-        errors.push('Password must contain at least one number');
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-        errors.push('Password must contain at least one special character');
-    }
-
-    return {
-        isValid: errors.length === 0,
-        errors,
-    };
-}
+// Re-export password policy from server-safe module so UI and API stay aligned
+export { isStrongPassword, MIN_PASSWORD_LENGTH } from '@/lib/input-validation';
 
 // ============================================================================
 // React Hook for Form Validation
@@ -518,8 +491,9 @@ export function parseAndValidateRegistrationInput(body: unknown): { email: strin
     if (!isValidEmail(email)) {
         throw new ValidationError('Invalid email format');
     }
-    if (password.length < 8) {
-        throw new ValidationError('Password must be at least 8 characters');
+    const strength = isStrongPassword(password);
+    if (!strength.isValid) {
+        throw new ValidationError(strength.errors[0] || 'Password does not meet requirements');
     }
 
     return { email, password, name };

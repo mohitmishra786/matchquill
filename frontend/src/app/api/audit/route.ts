@@ -1,27 +1,29 @@
 /**
  * Audit Log API Routes
  * GET /api/audit - Get audit logs (admin only)
- * For compliance and security monitoring
+ * DELETE /api/audit - Clean up old audit logs (admin only)
+ *
+ * Security: All handlers require authenticated admin privileges.
+ * Non-admin users receive 403 regardless of query parameters (prevents IDOR).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { 
-    getUserAuditLogs, 
-    getRecentAuditLogs, 
+import {
+    getUserAuditLogs,
+    getRecentAuditLogs,
     getAuditStats,
     cleanupOldAuditLogs,
     type AuditAction,
     type EntityType,
 } from '@/lib/audit';
+import { requireAdmin } from '@/lib/admin';
 import { createRequestLogger, getOrCreateRequestId } from '@/lib/logger';
-
-
 
 /**
  * GET /api/audit
  * Query params:
- * - userId: Filter by user (optional)
+ * - userId: Filter by user (optional, admin only)
  * - entityType: Filter by entity type (optional)
  * - entityId: Filter by entity ID (optional)
  * - actions: Comma-separated list of actions (optional)
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     try {
         const session = await auth();
-        
+
         if (!session?.user?.id) {
             logger.warn('Audit fetch failed - no session', { requestId });
             return NextResponse.json(
@@ -48,14 +50,56 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        // SECURITY: Admin-only — prevents IDOR via arbitrary userId filters
+        const adminCheck = await requireAdmin(session.user.id);
+        if (!adminCheck.ok) {
+            logger.warn('Audit fetch forbidden - non-admin', {
+                requestId,
+                userId: session.user.id,
+            });
+            return NextResponse.json(
+                { error: adminCheck.error, requestId },
+                { status: adminCheck.status }
+            );
+        }
+
         const { searchParams } = new URL(request.url);
+
+        // Parse shared query parameters
+        const userId = searchParams.get('userId') || undefined;
+        const entityType = searchParams.get('entityType') as EntityType | undefined;
+        const entityId = searchParams.get('entityId') || undefined;
+        const actionsParam = searchParams.get('actions');
+        const actions = actionsParam ? (actionsParam.split(',') as AuditAction[]) : undefined;
+        // Clamp limit to [1, 100] — negative values must not bypass the default
+        const limit = Math.min(
+            Math.max(parseInt(searchParams.get('limit') || '50', 10) || 50, 1),
+            100
+        );
+        const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10) || 0);
+        const startDate = searchParams.get('startDate');
+        const endDate = searchParams.get('endDate');
+
+        // Validate dates if provided (shared by stats and list paths)
+        if (startDate && Number.isNaN(Date.parse(startDate))) {
+            return NextResponse.json(
+                { error: 'Invalid startDate', requestId },
+                { status: 400 }
+            );
+        }
+        if (endDate && Number.isNaN(Date.parse(endDate))) {
+            return NextResponse.json(
+                { error: 'Invalid endDate', requestId },
+                { status: 400 }
+            );
+        }
 
         // Check if stats requested
         if (searchParams.get('stats') === 'true') {
-            const startDate = searchParams.get('startDate');
-            const endDate = searchParams.get('endDate');
-
-            logger.info('Fetching audit statistics', { requestId });
+            logger.info('Fetching audit statistics', {
+                requestId,
+                adminId: session.user.id,
+            });
 
             const stats = await getAuditStats(
                 startDate ? new Date(startDate) : undefined,
@@ -66,20 +110,10 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ stats, requestId });
         }
 
-        // Parse query parameters
-        const userId = searchParams.get('userId') || undefined;
-        const entityType = searchParams.get('entityType') as EntityType | undefined;
-        const entityId = searchParams.get('entityId') || undefined;
-        const actionsParam = searchParams.get('actions');
-        const actions = actionsParam ? actionsParam.split(',') as AuditAction[] : undefined;
-        const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
-        const offset = parseInt(searchParams.get('offset') || '0', 10);
-        const startDate = searchParams.get('startDate');
-        const endDate = searchParams.get('endDate');
-
         logger.info('Fetching audit logs', {
             requestId,
-            userId,
+            adminId: session.user.id,
+            filterUserId: userId,
             entityType,
             entityId,
             actions,
@@ -91,7 +125,6 @@ export async function GET(request: NextRequest) {
         let total;
 
         if (userId) {
-            // Get logs for specific user
             const result = await getUserAuditLogs(userId, {
                 limit,
                 offset,
@@ -102,7 +135,6 @@ export async function GET(request: NextRequest) {
             logs = result.logs;
             total = result.total;
         } else if (entityType && entityId) {
-            // Get logs for specific entity
             const { getEntityAuditLogs } = await import('@/lib/audit');
             const result = await getEntityAuditLogs(entityType, entityId, {
                 limit,
@@ -112,7 +144,6 @@ export async function GET(request: NextRequest) {
             logs = result.logs;
             total = result.total;
         } else {
-            // Get recent logs
             logs = await getRecentAuditLogs({
                 limit,
                 actions,
@@ -168,7 +199,7 @@ export async function DELETE(request: NextRequest) {
 
     try {
         const session = await auth();
-        
+
         if (!session?.user?.id) {
             logger.warn('Audit cleanup failed - no session', { requestId });
             return NextResponse.json(
@@ -177,22 +208,36 @@ export async function DELETE(request: NextRequest) {
             );
         }
 
+        // SECURITY: Admin-only cleanup
+        const adminCheck = await requireAdmin(session.user.id);
+        if (!adminCheck.ok) {
+            logger.warn('Audit cleanup forbidden - non-admin', {
+                requestId,
+                userId: session.user.id,
+            });
+            return NextResponse.json(
+                { error: adminCheck.error, requestId },
+                { status: adminCheck.status }
+            );
+        }
+
         const { searchParams } = new URL(request.url);
-        const retentionDays = parseInt(searchParams.get('retentionDays') || '365', 10);
+        const retentionDaysRaw = parseInt(searchParams.get('retentionDays') || '365', 10);
+        // Bound retention days to prevent accidental mass deletion or invalid values
+        const retentionDays = Math.min(Math.max(retentionDaysRaw || 365, 30), 3650);
         const dryRun = searchParams.get('dryRun') === 'true';
 
         logger.info('Cleaning up old audit logs', {
             requestId,
+            adminId: session.user.id,
             retentionDays,
             dryRun,
         });
 
         if (dryRun) {
-            // In dry run mode, just calculate what would be deleted
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
-            // Import prisma to count
             const { default: prisma } = await import('@/lib/prisma');
             const count = await prisma.auditLog.count({
                 where: {
@@ -217,7 +262,6 @@ export async function DELETE(request: NextRequest) {
 
         logger.info('Audit cleanup completed', { requestId, deletedCount });
 
-        // Log the cleanup action
         const { auditFromRequest } = await import('@/lib/audit');
         const userId = session.user.id;
         await auditFromRequest(request, {

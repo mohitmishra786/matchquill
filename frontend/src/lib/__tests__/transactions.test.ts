@@ -210,7 +210,7 @@ describe('createExperiencesBatch', () => {
         vi.clearAllMocks();
     });
 
-    it('should create multiple experiences in transaction', async () => {
+    it('should batch-create multiple experiences with createManyAndReturn', async () => {
         const experiences = [
             { company: 'Acme', title: 'Dev', description: 'Worked', startDate: new Date('2020-01-01') },
             { company: 'TechCorp', title: 'Senior Dev', description: 'Led team', startDate: new Date('2022-01-01') },
@@ -218,9 +218,11 @@ describe('createExperiencesBatch', () => {
 
         const mockTx = {
             experience: {
-                create: vi.fn()
-                    .mockResolvedValueOnce({ id: 'exp-1', ...experiences[0] })
-                    .mockResolvedValueOnce({ id: 'exp-2', ...experiences[1] }),
+                createManyAndReturn: vi.fn().mockResolvedValue([
+                    { id: 'exp-1', ...experiences[0] },
+                    { id: 'exp-2', ...experiences[1] },
+                ]),
+                create: vi.fn(),
             },
         };
 
@@ -231,7 +233,21 @@ describe('createExperiencesBatch', () => {
         const result = await createExperiencesBatch('user-1', experiences);
 
         expect(result).toHaveLength(2);
-        expect(mockTx.experience.create).toHaveBeenCalledTimes(2);
+        // One batched call instead of N create() round-trips
+        expect(mockTx.experience.createManyAndReturn).toHaveBeenCalledTimes(1);
+        expect(mockTx.experience.create).not.toHaveBeenCalled();
+        expect(mockTx.experience.createManyAndReturn).toHaveBeenCalledWith({
+            data: expect.arrayContaining([
+                expect.objectContaining({ userId: 'user-1', company: 'Acme' }),
+                expect.objectContaining({ userId: 'user-1', company: 'TechCorp' }),
+            ]),
+        });
+    });
+
+    it('should short-circuit on empty input without a DB write', async () => {
+        const result = await createExperiencesBatch('user-1', []);
+        expect(result).toEqual([]);
+        expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 });
 
@@ -240,7 +256,7 @@ describe('createSkillsBatch', () => {
         vi.clearAllMocks();
     });
 
-    it('should create skills and handle duplicates', async () => {
+    it('should batch-create skills and handle duplicates', async () => {
         const skills = [
             { name: 'JavaScript', category: 'Programming' },
             { name: 'Python', category: 'Programming' },
@@ -249,9 +265,11 @@ describe('createSkillsBatch', () => {
         const mockTx = {
             skill: {
                 findMany: vi.fn().mockResolvedValue([]),
-                create: vi.fn()
-                    .mockResolvedValueOnce({ id: 'skill-1', ...skills[0] })
-                    .mockResolvedValueOnce({ id: 'skill-2', ...skills[1] }),
+                createManyAndReturn: vi.fn().mockResolvedValue([
+                    { id: 'skill-1', ...skills[0] },
+                    { id: 'skill-2', ...skills[1] },
+                ]),
+                create: vi.fn(),
             },
         };
 
@@ -263,6 +281,8 @@ describe('createSkillsBatch', () => {
 
         expect(result.created).toHaveLength(2);
         expect(result.duplicates).toHaveLength(0);
+        expect(mockTx.skill.createManyAndReturn).toHaveBeenCalledTimes(1);
+        expect(mockTx.skill.create).not.toHaveBeenCalled();
     });
 
     it('should skip existing skills', async () => {
@@ -274,7 +294,10 @@ describe('createSkillsBatch', () => {
         const mockTx = {
             skill: {
                 findMany: vi.fn().mockResolvedValue([{ name: 'javascript' }]),
-                create: vi.fn().mockResolvedValue({ id: 'skill-2', ...skills[1] }),
+                createManyAndReturn: vi.fn().mockResolvedValue([
+                    { id: 'skill-2', name: 'Python', category: 'Programming' },
+                ]),
+                create: vi.fn(),
             },
         };
 
@@ -286,6 +309,9 @@ describe('createSkillsBatch', () => {
 
         expect(result.created).toHaveLength(1);
         expect(result.duplicates).toContain('JavaScript');
+        expect(mockTx.skill.createManyAndReturn).toHaveBeenCalledWith({
+            data: [expect.objectContaining({ name: 'Python' })],
+        });
     });
 });
 
@@ -294,7 +320,7 @@ describe('createEducationsBatch', () => {
         vi.clearAllMocks();
     });
 
-    it('should create multiple educations in transaction', async () => {
+    it('should batch-create multiple educations with createManyAndReturn', async () => {
         const educations = [
             { institution: 'MIT', degree: 'BS', field: 'CS', startDate: new Date('2016-09-01') },
             { institution: 'Stanford', degree: 'MS', field: 'AI', startDate: new Date('2020-09-01') },
@@ -302,9 +328,11 @@ describe('createEducationsBatch', () => {
 
         const mockTx = {
             education: {
-                create: vi.fn()
-                    .mockResolvedValueOnce({ id: 'edu-1', ...educations[0] })
-                    .mockResolvedValueOnce({ id: 'edu-2', ...educations[1] }),
+                createManyAndReturn: vi.fn().mockResolvedValue([
+                    { id: 'edu-1', ...educations[0] },
+                    { id: 'edu-2', ...educations[1] },
+                ]),
+                create: vi.fn(),
             },
         };
 
@@ -315,6 +343,8 @@ describe('createEducationsBatch', () => {
         const result = await createEducationsBatch('user-1', educations);
 
         expect(result).toHaveLength(2);
+        expect(mockTx.education.createManyAndReturn).toHaveBeenCalledTimes(1);
+        expect(mockTx.education.create).not.toHaveBeenCalled();
     });
 });
 
@@ -323,7 +353,7 @@ describe('createProjectsBatch', () => {
         vi.clearAllMocks();
     });
 
-    it('should create multiple projects in transaction', async () => {
+    it('should batch-create multiple projects with createManyAndReturn', async () => {
         const projects = [
             { name: 'Project A', description: 'Description A' },
             { name: 'Project B', description: 'Description B' },
@@ -331,9 +361,11 @@ describe('createProjectsBatch', () => {
 
         const mockTx = {
             project: {
-                create: vi.fn()
-                    .mockResolvedValueOnce({ id: 'proj-1', ...projects[0] })
-                    .mockResolvedValueOnce({ id: 'proj-2', ...projects[1] }),
+                createManyAndReturn: vi.fn().mockResolvedValue([
+                    { id: 'proj-1', ...projects[0] },
+                    { id: 'proj-2', ...projects[1] },
+                ]),
+                create: vi.fn(),
             },
         };
 
@@ -344,6 +376,8 @@ describe('createProjectsBatch', () => {
         const result = await createProjectsBatch('user-1', projects);
 
         expect(result).toHaveLength(2);
+        expect(mockTx.project.createManyAndReturn).toHaveBeenCalledTimes(1);
+        expect(mockTx.project.create).not.toHaveBeenCalled();
     });
 });
 
@@ -385,7 +419,7 @@ describe('importCompleteProfile', () => {
         vi.clearAllMocks();
     });
 
-    it('should import complete profile data in transaction', async () => {
+    it('should import complete profile data using batched inserts', async () => {
         const mockTx = {
             user: {
                 update: vi.fn().mockResolvedValue({ id: 'user-1', name: 'John' }),
@@ -394,17 +428,21 @@ describe('importCompleteProfile', () => {
                 upsert: vi.fn().mockResolvedValue({ id: 'settings-1', selectedTemplate: 'modern' }),
             },
             experience: {
-                create: vi.fn().mockResolvedValue({ id: 'exp-1' }),
+                createManyAndReturn: vi.fn().mockResolvedValue([{ id: 'exp-1' }]),
+                create: vi.fn(),
             },
             education: {
-                create: vi.fn().mockResolvedValue({ id: 'edu-1' }),
+                createManyAndReturn: vi.fn().mockResolvedValue([{ id: 'edu-1' }]),
+                create: vi.fn(),
             },
             skill: {
                 findMany: vi.fn().mockResolvedValue([]),
-                create: vi.fn().mockResolvedValue({ id: 'skill-1' }),
+                createManyAndReturn: vi.fn().mockResolvedValue([{ id: 'skill-1' }]),
+                create: vi.fn(),
             },
             project: {
-                create: vi.fn().mockResolvedValue({ id: 'proj-1' }),
+                createManyAndReturn: vi.fn().mockResolvedValue([{ id: 'proj-1' }]),
+                create: vi.fn(),
             },
         };
 
@@ -427,6 +465,12 @@ describe('importCompleteProfile', () => {
         expect(result.educations).toHaveLength(1);
         expect(result.skills.created).toHaveLength(1);
         expect(result.projects).toHaveLength(1);
+        // Ensure N+1 create() is not used
+        expect(mockTx.experience.create).not.toHaveBeenCalled();
+        expect(mockTx.education.create).not.toHaveBeenCalled();
+        expect(mockTx.skill.create).not.toHaveBeenCalled();
+        expect(mockTx.project.create).not.toHaveBeenCalled();
+        expect(mockTx.experience.createManyAndReturn).toHaveBeenCalledTimes(1);
     });
 
     it('should handle partial imports', async () => {
@@ -438,16 +482,20 @@ describe('importCompleteProfile', () => {
                 upsert: vi.fn(),
             },
             experience: {
+                createManyAndReturn: vi.fn(),
                 create: vi.fn(),
             },
             education: {
+                createManyAndReturn: vi.fn(),
                 create: vi.fn(),
             },
             skill: {
                 findMany: vi.fn().mockResolvedValue([]),
+                createManyAndReturn: vi.fn(),
                 create: vi.fn(),
             },
             project: {
+                createManyAndReturn: vi.fn(),
                 create: vi.fn(),
             },
         };
@@ -463,6 +511,7 @@ describe('importCompleteProfile', () => {
         expect(result.profile).toBeDefined();
         expect(result.settings).toBeNull();
         expect(result.experiences).toHaveLength(0);
+        expect(mockTx.experience.createManyAndReturn).not.toHaveBeenCalled();
         expect(mockTx.experience.create).not.toHaveBeenCalled();
     });
 });

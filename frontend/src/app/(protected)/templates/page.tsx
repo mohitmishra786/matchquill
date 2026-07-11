@@ -5,12 +5,13 @@
  * Resume template selection with previews
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import TemplatePreview from '@/components/templates/TemplatePreview';
 import { useToast } from '@/components/ui/ToastProvider';
 import TemplatesSkeleton from '@/components/skeletons/TemplatesSkeleton';
 import { createLogger } from '@/lib/logger';
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue';
 
 const logger = createLogger({ component: 'TemplatesPage' });
 
@@ -108,14 +109,14 @@ const TEMPLATES = [
 ];
 
 export default function TemplatesPage() {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { data: session, status } = useSession();
+    const { status } = useSession();
     const { success, error: toastError } = useToast();
     const [selectedTemplate, setSelectedTemplate] = useState('experience-skills-projects');
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
     const [filterCategory, setFilterCategory] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
+    const debouncedSearch = useDebouncedValue(searchQuery, 250);
 
     useEffect(() => {
         // Load current setting
@@ -150,15 +151,20 @@ export default function TemplatesPage() {
         }
     };
 
-    const filteredTemplates = TEMPLATES.filter(template => {
-        const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            template.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            template.bestFor?.some(role => role.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredTemplates = useMemo(() => {
+        const q = debouncedSearch.toLowerCase();
+        return TEMPLATES.filter((template) => {
+            const matchesSearch =
+                !q ||
+                template.name.toLowerCase().includes(q) ||
+                template.description.toLowerCase().includes(q) ||
+                template.bestFor?.some((role) => role.toLowerCase().includes(q));
 
-        const matchesCategory = filterCategory === 'All' || template.category === filterCategory;
+            const matchesCategory = filterCategory === 'All' || template.category === filterCategory;
 
-        return matchesSearch && matchesCategory;
-    });
+            return matchesSearch && matchesCategory;
+        });
+    }, [debouncedSearch, filterCategory]);
 
     if (status === 'loading' || loading) {
         return <TemplatesSkeleton />;

@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import type { Skill } from '@/types';
 import { createLogger } from '@/lib/logger';
+import { sanitizeSkillData } from '@/lib/sanitization';
 
 const logger = createLogger({ component: 'SkillForm' });
 
@@ -36,13 +37,13 @@ const PROFICIENCY_LEVELS = [
 ];
 
 export default function SkillForm({ skill, onSubmit, onCancel }: SkillFormProps) {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{ name: string; category: string; proficiency: string; yearsExp: string }>({
         name: skill?.name || '',
         category: skill?.category || 'Programming Languages',
         proficiency: skill?.proficiency || '',
         yearsExp: skill?.yearsExp?.toString() || '',
     });
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState<boolean>(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     logger.debug('[SkillForm] Initialized', {
@@ -81,11 +82,18 @@ export default function SkillForm({ skill, onSubmit, onCancel }: SkillFormProps)
         setLoading(true);
 
         try {
-            const data: Partial<Skill> = {
+            const sanitized = sanitizeSkillData({
                 name: formData.name.trim(),
                 category: formData.category,
                 proficiency: formData.proficiency || undefined,
                 yearsExp: formData.yearsExp ? Number(formData.yearsExp) : undefined,
+            });
+
+            const data: Partial<Skill> = {
+                name: sanitized.name,
+                category: sanitized.category,
+                proficiency: sanitized.proficiency || undefined,
+                yearsExp: formData.yearsExp ? sanitized.yearsExp : undefined,
             };
 
             await onSubmit(data);
@@ -105,25 +113,31 @@ export default function SkillForm({ skill, onSubmit, onCancel }: SkillFormProps)
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Skill Name *</label>
+                <label htmlFor="skill-name" className="block text-sm font-medium text-gray-700 mb-1">Skill Name *</label>
                 <input
+                    id="skill-name"
                     type="text"
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
+                    aria-invalid={!!errors.name}
+                    aria-describedby={errors.name ? 'skill-name-error' : undefined}
                     className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none ${errors.name ? 'border-red-500' : 'border-gray-300'
                         }`}
                     placeholder="e.g., React, Python, Project Management"
                 />
-                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                {errors.name && <p id="skill-name-error" className="mt-1 text-sm text-red-600" role="alert" aria-live="assertive">{errors.name}</p>}
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                <label htmlFor="skill-category" className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
                 <select
+                    id="skill-category"
                     value={formData.category}
                     onChange={(e) => handleChange('category', e.target.value)}
+                    aria-invalid={!!errors.category}
+                    aria-describedby={errors.category ? 'skill-category-error' : undefined}
                     className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none ${errors.category ? 'border-red-500' : 'border-gray-300'
                         }`}
                 >
@@ -131,12 +145,13 @@ export default function SkillForm({ skill, onSubmit, onCancel }: SkillFormProps)
                         <option key={cat} value={cat}>{cat}</option>
                     ))}
                 </select>
-                {errors.category && <p className="mt-1 text-sm text-red-600">{errors.category}</p>}
+                {errors.category && <p id="skill-category-error" className="mt-1 text-sm text-red-600" role="alert" aria-live="assertive">{errors.category}</p>}
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Proficiency Level</label>
+                <label htmlFor="skill-proficiency" className="block text-sm font-medium text-gray-700 mb-1">Proficiency Level</label>
                 <select
+                    id="skill-proficiency"
                     value={formData.proficiency}
                     onChange={(e) => handleChange('proficiency', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -149,19 +164,22 @@ export default function SkillForm({ skill, onSubmit, onCancel }: SkillFormProps)
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Years of Experience</label>
+                <label htmlFor="skill-years" className="block text-sm font-medium text-gray-700 mb-1">Years of Experience</label>
                 <input
+                    id="skill-years"
                     type="number"
                     min="0"
                     max="50"
                     step="0.5"
                     value={formData.yearsExp}
                     onChange={(e) => handleChange('yearsExp', e.target.value)}
+                    aria-invalid={!!errors.yearsExp}
+                    aria-describedby={errors.yearsExp ? 'skill-years-error' : undefined}
                     className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none ${errors.yearsExp ? 'border-red-500' : 'border-gray-300'
                         }`}
                     placeholder="e.g., 3"
                 />
-                {errors.yearsExp && <p className="mt-1 text-sm text-red-600">{errors.yearsExp}</p>}
+                {errors.yearsExp && <p id="skill-years-error" className="mt-1 text-sm text-red-600" role="alert" aria-live="assertive">{errors.yearsExp}</p>}
             </div>
 
             <div className="flex gap-3 pt-4">

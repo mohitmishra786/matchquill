@@ -21,6 +21,7 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/rate-limit', () => ({
     isRateLimited: vi.fn(),
     getClientIP: vi.fn(),
+    validateBotProtection: vi.fn(() => true),
     rateLimits: {
         registration: { maxRequests: 5, windowMs: 900000 },
     },
@@ -35,6 +36,8 @@ vi.mock('bcryptjs', () => ({
 import prisma from '@/lib/prisma';
 import { isRateLimited, getClientIP } from '@/lib/rate-limit';
 import bcrypt from 'bcryptjs';
+
+const STRONG_PASSWORD = 'SecurePass123!';
 
 describe('POST /api/auth/register', () => {
     beforeEach(() => {
@@ -58,7 +61,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: STRONG_PASSWORD,
                 name: 'Test User',
             }),
         });
@@ -69,14 +72,14 @@ describe('POST /api/auth/register', () => {
         expect(response.status).toBe(201);
         expect(data.message).toBe('User created successfully');
         expect(data.user.email).toBe('test@example.com');
-        expect(bcrypt.hash).toHaveBeenCalledWith('securepass123', 12);
+        expect(bcrypt.hash).toHaveBeenCalledWith(STRONG_PASSWORD, 12);
     });
 
     it('should reject registration without email', async () => {
         const request = new NextRequest('http://localhost:3000/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({
-                password: 'securepass123',
+                password: STRONG_PASSWORD,
             }),
         });
 
@@ -107,7 +110,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'invalid-email',
-                password: 'securepass123',
+                password: STRONG_PASSWORD,
             }),
         });
 
@@ -118,7 +121,7 @@ describe('POST /api/auth/register', () => {
         expect(data.error).toContain('Invalid email format');
     });
 
-    it('should reject password shorter than 8 characters', async () => {
+    it('should reject password shorter than 10 characters', async () => {
         const request = new NextRequest('http://localhost:3000/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({
@@ -131,7 +134,23 @@ describe('POST /api/auth/register', () => {
         const data = await response.json();
 
         expect(response.status).toBe(400);
-        expect(data.error).toContain('Password must be at least 8 characters');
+        expect(data.error).toContain('Password must be at least 10 characters');
+    });
+
+    it('should reject password missing special character', async () => {
+        const request = new NextRequest('http://localhost:3000/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+                email: 'test@example.com',
+                password: 'SecurePass123',
+            }),
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(data.error).toContain('special character');
     });
 
     it('should reject registration if user already exists', async () => {
@@ -144,7 +163,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: STRONG_PASSWORD,
             }),
         });
 
@@ -162,7 +181,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: STRONG_PASSWORD,
             }),
         });
 
@@ -182,7 +201,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: STRONG_PASSWORD,
             }),
         });
 
@@ -190,7 +209,7 @@ describe('POST /api/auth/register', () => {
         const data = await response.json();
 
         expect(response.status).toBe(500);
-        expect(data.error).toContain('Internal server error');
+        expect(data.error).toContain('An internal error occurred');
     });
 
     it('should create user without name if not provided', async () => {
@@ -208,7 +227,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: STRONG_PASSWORD,
             }),
         });
 
@@ -236,7 +255,7 @@ describe('POST /api/auth/register', () => {
             method: 'POST',
             body: JSON.stringify({
                 email: 'test@example.com',
-                password: 'securepass123',
+                password: STRONG_PASSWORD,
                 name: 'Test User',
             }),
         });

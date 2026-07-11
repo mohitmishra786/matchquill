@@ -7,7 +7,7 @@ import pytest
 import tempfile
 import os
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 import jwt
 from datetime import datetime, timedelta
 
@@ -29,8 +29,21 @@ def valid_token():
 
 
 @pytest.fixture
-def client():
-    """Create test client."""
+def mock_db_auth():
+    """Mock DB user validation used by verify_auth_token_with_db."""
+    from app.middleware.auth import clear_db_auth_cache
+    clear_db_auth_cache()
+    mock_service = AsyncMock()
+    mock_service.validate_token.return_value = "test-user-id"
+    mock_service.close = AsyncMock()
+    with patch("app.services.profile_service.ProfileService", return_value=mock_service):
+        yield mock_service
+    clear_db_auth_cache()
+
+
+@pytest.fixture
+def client(mock_db_auth):
+    """Create test client with DB auth mocked."""
     return TestClient(app)
 
 

@@ -21,10 +21,14 @@ TemplateType = Literal[
 class ResumeRequest(BaseModel):
     """Request body for resume compilation endpoint."""
     
-    auth_token: str = Field(
-        ...,
-        description="JWT auth token from NextAuth",
-        alias="authToken"
+    auth_token: Optional[str] = Field(
+        default=None,
+        description=(
+            "DEPRECATED: Prefer Authorization: Bearer <token> header. "
+            "Body authToken is accepted for backward compatibility only."
+        ),
+        alias="authToken",
+        deprecated=True,
     )
     job_description: str = Field(
         ...,

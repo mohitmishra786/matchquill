@@ -72,6 +72,11 @@ class RateLimitConfig:
     COMPILE_RESUME = ["5/minute", "30/hour"]  # PDF generation is resource intensive
     GENERATE_COVER_LETTER = ["5/minute", "30/hour"]  # LLM API calls cost money
     
+    # AI / LLM endpoints — tighter quotas to control cost and abuse
+    AI_ENHANCE_BULLET = ["10/minute", "60/hour"]
+    AI_INTERVIEW_PREP = ["5/minute", "20/hour"]
+    AI_SUGGEST_SKILLS = ["10/minute", "50/hour"]
+    
     # Moderate limits for standard operations
     GET_PROFILE = ["60/minute", "1000/hour"]
     UPDATE_PROFILE = ["30/minute", "500/hour"]

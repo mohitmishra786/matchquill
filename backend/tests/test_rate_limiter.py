@@ -21,6 +21,10 @@ class TestRateLimiter:
         assert RateLimitConfig.GENERATE_COVER_LETTER == ["5/minute", "30/hour"]
         assert RateLimitConfig.GET_TEMPLATES == ["100/minute"]
         assert RateLimitConfig.GET_PROFILE == ["60/minute", "1000/hour"]
+        assert RateLimitConfig.AI_ENHANCE_BULLET == ["10/minute", "60/hour"]
+        assert RateLimitConfig.AI_INTERVIEW_PREP == ["5/minute", "20/hour"]
+        assert RateLimitConfig.AI_SUGGEST_SKILLS == ["10/minute", "50/hour"]
+        assert RateLimitConfig.UPLOAD_RESUME == ["10/minute", "50/hour"]
 
     def test_get_user_identifier_with_auth(self):
         """Test user identifier extraction from auth header."""
@@ -150,3 +154,32 @@ class TestRedisCacheFallback:
         assert "available" in health
         assert "connected" in health
         assert "consecutive_failures" in health
+
+
+class TestAIRateLimitedEndpoints:
+    """Verify AI routes enforce rate limiting configuration and auth."""
+
+    def test_enhance_bullet_requires_auth(self, client: TestClient):
+        response = client.post("/ai/enhance-bullet", json={"bullet": "Built features"})
+        assert response.status_code == 401
+
+    def test_interview_prep_requires_auth(self, client: TestClient):
+        response = client.post(
+            "/ai/interview-prep",
+            json={"candidate_info": "Senior engineer with 5 years experience"},
+        )
+        assert response.status_code == 401
+
+    def test_suggest_skills_requires_auth(self, client: TestClient):
+        response = client.post(
+            "/ai/suggest-skills",
+            json={"experience_text": "Built distributed systems in Python"},
+        )
+        assert response.status_code == 401
+
+    def test_ai_rate_limit_config_is_stricter_than_default(self):
+        """AI prep is expensive; ensure hourly caps exist."""
+        assert len(RateLimitConfig.AI_INTERVIEW_PREP) >= 2
+        assert any("hour" in limit for limit in RateLimitConfig.AI_INTERVIEW_PREP)
+        assert any("hour" in limit for limit in RateLimitConfig.AI_ENHANCE_BULLET)
+        assert any("hour" in limit for limit in RateLimitConfig.AI_SUGGEST_SKILLS)

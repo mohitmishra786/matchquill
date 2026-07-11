@@ -2,12 +2,50 @@
 Configuration module for CV-Wiz backend.
 Loads environment variables and provides typed settings.
 Fails loudly if required environment variables are missing.
+Validates URL formats for configuration endpoints.
 """
 
 import os
 from functools import lru_cache
+from urllib.parse import urlparse
 from pydantic_settings import BaseSettings
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, field_validator
+
+
+def _is_valid_http_url(value: str, *, allow_empty: bool = True) -> bool:
+    """Return True if value is empty (when allowed) or a valid http(s) URL."""
+    if not value:
+        return allow_empty
+    try:
+        parsed = urlparse(value)
+        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+    except Exception:
+        return False
+
+
+def _is_valid_redis_url(value: str, *, allow_empty: bool = True) -> bool:
+    if not value:
+        return allow_empty
+    try:
+        parsed = urlparse(value)
+        return parsed.scheme in ("redis", "rediss") and bool(parsed.netloc)
+    except Exception:
+        return False
+
+
+def _is_valid_database_url(value: str, *, allow_empty: bool = True) -> bool:
+    if not value:
+        return allow_empty
+    try:
+        parsed = urlparse(value)
+        return parsed.scheme in (
+            "postgresql",
+            "postgres",
+            "postgresql+asyncpg",
+            "postgresql+psycopg2",
+        ) and bool(parsed.netloc)
+    except Exception:
+        return False
 
 
 class Settings(BaseSettings):
@@ -41,14 +79,20 @@ class Settings(BaseSettings):
     # Frontend URLs - REQUIRED in production
     frontend_url: str = Field(default="", validation_alias="FRONTEND_URL")
     frontend_api_url: str = Field(default="", validation_alias="FRONTEND_API_URL")
+
+    # Service-to-service shared secret for internal API calls (optional but recommended)
+    internal_api_secret: str = Field(default="", validation_alias="INTERNAL_API_SECRET")
+
+    # Feature flags (comma-separated names that are enabled)
+    feature_flags: str = Field(default="", validation_alias="FEATURE_FLAGS")
     
-    # Cache TTL (seconds)
-    cache_ttl: int = 300  # 5 minutes
-    cache_ttl_short: int = 60  # 1 minute for frequently changing data
-    cache_ttl_long: int = 3600  # 1 hour for static data
+    # Cache TTL (seconds) — overridable via env for ops tuning
+    cache_ttl: int = Field(default=300, validation_alias="CACHE_TTL")
+    cache_ttl_short: int = Field(default=60, validation_alias="CACHE_TTL_SHORT")
+    cache_ttl_long: int = Field(default=3600, validation_alias="CACHE_TTL_LONG")
     
     # PDF settings
-    max_resume_pages: int = 1
+    max_resume_pages: int = Field(default=1, validation_alias="MAX_RESUME_PAGES")
     
     # Monitoring
     sentry_dsn: str = Field(default="", validation_alias="SENTRY_DSN")
@@ -59,6 +103,34 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         extra = "ignore"  # Allow extra fields from .env
         populate_by_name = True  # Allow using either field name or alias
+
+    @field_validator("frontend_url", "nextauth_url", "frontend_api_url", "sentry_dsn")
+    @classmethod
+    def validate_http_urls(cls, v: str) -> str:
+        if v and not _is_valid_http_url(v, allow_empty=False):
+            raise ValueError(f"Invalid HTTP(S) URL: {v!r}")
+        return v
+
+    @field_validator("redis_url")
+    @classmethod
+    def validate_redis_url(cls, v: str) -> str:
+        if v and not _is_valid_redis_url(v, allow_empty=False):
+            raise ValueError(f"Invalid Redis URL (expected redis:// or rediss://): {v!r}")
+        return v
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        if v and not _is_valid_database_url(v, allow_empty=False):
+            raise ValueError(f"Invalid DATABASE_URL (expected postgresql://...): {v!r}")
+        return v
+
+    @field_validator("upstash_redis_rest_url")
+    @classmethod
+    def validate_upstash_url(cls, v: str) -> str:
+        if v and not _is_valid_http_url(v, allow_empty=False):
+            raise ValueError(f"Invalid Upstash REST URL: {v!r}")
+        return v
     
     @model_validator(mode='after')
     def validate_required_settings(self) -> 'Settings':
@@ -96,6 +168,13 @@ class Settings(BaseSettings):
     def effective_frontend_url(self) -> str:
         """Get the effective frontend URL for CORS."""
         return self.frontend_url or self.nextauth_url
+
+    def is_feature_enabled(self, flag: str) -> bool:
+        """Check if a named feature flag is enabled via FEATURE_FLAGS env."""
+        if not self.feature_flags or not flag:
+            return False
+        enabled = {f.strip().lower() for f in self.feature_flags.split(",") if f.strip()}
+        return flag.strip().lower() in enabled
 
 
 def _get_env_with_fallbacks(primary: str, *fallbacks: str, default: str = "") -> str:

@@ -6,7 +6,8 @@ Matches job descriptions to user profile items.
 import re
 from collections import Counter
 from dataclasses import dataclass
-from typing import TypeVar, Generic
+import heapq
+from typing import TypeVar, Generic, Optional, Callable, List, Any
 
 from app.models.user import (
     UserProfile,
@@ -331,38 +332,57 @@ class RelevanceScorer:
         pub.relevance_score = score
         return ScoredItem(item=pub, score=score, matched_keywords=matched)
     
-    def score_profile(self, profile: UserProfile) -> dict[str, list]:
+    def _top_scored(
+        self,
+        items: list,
+        scorer: Callable[[Any], ScoredItem],
+        k: Optional[int] = None,
+    ) -> List[ScoredItem]:
+        """
+        Score items and return top-k by score using heapq.nlargest (O(n log k)).
+        When k is None, return all items sorted by score descending.
+        """
+        scored = [scorer(item) for item in items]
+        if not scored:
+            return []
+        if k is None or k >= len(scored):
+            return sorted(scored, key=lambda x: x.score, reverse=True)
+        return heapq.nlargest(k, scored, key=lambda x: x.score)
+
+    def score_profile(
+        self,
+        profile: UserProfile,
+        *,
+        max_experiences: Optional[int] = None,
+        max_projects: Optional[int] = None,
+        max_skills: Optional[int] = None,
+        max_education: Optional[int] = None,
+        max_publications: Optional[int] = None,
+    ) -> dict[str, list]:
         """
         Score all items in a user profile.
-        
+
+        When max_* limits are provided, uses heapq.nlargest for O(n log k)
+        instead of full O(n log n) sorts (only top-k needed).
+
         Returns:
             Dict with scored items sorted by relevance for each category.
         """
         return {
-            "experiences": sorted(
-                [self.score_experience(exp) for exp in profile.experiences],
-                key=lambda x: x.score,
-                reverse=True,
+            "experiences": self._top_scored(
+                profile.experiences, self.score_experience, max_experiences
             ),
-            "projects": sorted(
-                [self.score_project(proj) for proj in profile.projects],
-                key=lambda x: x.score,
-                reverse=True,
+            "projects": self._top_scored(
+                profile.projects, self.score_project, max_projects
             ),
-            "skills": sorted(
-                [self.score_skill(skill) for skill in profile.skills],
-                key=lambda x: x.score,
-                reverse=True,
+            "skills": self._top_scored(
+                profile.skills, self.score_skill, max_skills
             ),
-            "educations": sorted(
-                [self.score_education(edu) for edu in profile.educations],
-                key=lambda x: x.score,
-                reverse=True,
+            "educations": self._top_scored(
+                profile.educations, self.score_education, max_education
             ),
-            "publications": sorted(
-                [self.score_publication(pub) for pub in profile.publications],
-                key=lambda x: x.score,
-                reverse=True,
+            "publications": self._top_scored(
+                profile.publications, self.score_publication, max_publications
             ),
         }
     
@@ -385,12 +405,20 @@ class RelevanceScorer:
         Returns:
             Dict with selected items for each category
         """
-        scored = self.score_profile(profile)
+        # Score only top-k per category (O(n log k) via heapq.nlargest)
+        scored = self.score_profile(
+            profile,
+            max_experiences=max_experiences,
+            max_projects=max_projects,
+            max_skills=max_skills,
+            max_education=max_education,
+            max_publications=max_publications,
+        )
         
         return {
-            "experiences": [s.item for s in scored["experiences"][:max_experiences]],
-            "projects": [s.item for s in scored["projects"][:max_projects]],
-            "skills": [s.item for s in scored["skills"][:max_skills]],
-            "educations": [s.item for s in scored["educations"][:max_education]],
-            "publications": [s.item for s in scored["publications"][:max_publications]],
+            "experiences": [s.item for s in scored["experiences"]],
+            "projects": [s.item for s in scored["projects"]],
+            "skills": [s.item for s in scored["skills"]],
+            "educations": [s.item for s in scored["educations"]],
+            "publications": [s.item for s in scored["publications"]],
         }

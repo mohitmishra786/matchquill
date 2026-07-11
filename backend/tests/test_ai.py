@@ -43,8 +43,21 @@ def mock_groq_client() -> AsyncMock:
 
 
 @pytest.fixture
-def client(mock_groq_client: AsyncMock) -> Generator[TestClient, None, None]:
-    """Create test client with mocked GroqClient."""
+def mock_db_auth() -> Generator[AsyncMock, None, None]:
+    """Mock DB user validation used by verify_auth_token_with_db."""
+    from app.middleware.auth import clear_db_auth_cache
+    clear_db_auth_cache()
+    mock_service = AsyncMock()
+    mock_service.validate_token.return_value = "test-user-id"
+    mock_service.close = AsyncMock()
+    with patch("app.services.profile_service.ProfileService", return_value=mock_service):
+        yield mock_service
+    clear_db_auth_cache()
+
+
+@pytest.fixture
+def client(mock_groq_client: AsyncMock, mock_db_auth: AsyncMock) -> Generator[TestClient, None, None]:
+    """Create test client with mocked GroqClient and DB auth."""
     with patch("app.routers.ai.GroqClient", return_value=mock_groq_client):
         with TestClient(app) as c:
             yield c

@@ -24,9 +24,11 @@ import {
 
 describe('sanitizeText', () => {
     it('should remove HTML tags from text', () => {
-        expect(sanitizeText('<script>alert("xss")</script>Hello')).toBe('alert("xss")Hello');
+        // DOMPurify strips script elements (and their contents) entirely
+        expect(sanitizeText('<script>alert("xss")</script>Hello')).toBe('Hello');
         expect(sanitizeText('<p>Hello</p>')).toBe('Hello');
         expect(sanitizeText('<div>Test</div>')).toBe('Test');
+        expect(sanitizeText('<b>Bold</b> text')).toBe('Bold text');
     });
 
     it('should handle null and undefined', () => {
@@ -57,6 +59,22 @@ describe('sanitizeRichText', () => {
         expect(sanitizeRichText('<script>alert(1)</script>')).toBe('');
         expect(sanitizeRichText('<iframe src="evil.com"></iframe>')).toBe('');
         expect(sanitizeRichText('<object data="evil.swf"></object>')).toBe('');
+    });
+
+    it('should strip event handlers and javascript URLs from anchors', () => {
+        const result = sanitizeRichText(
+            '<a href="javascript:alert(1)" onclick="evil()">click</a>'
+        );
+        expect(result).not.toContain('javascript:');
+        expect(result).not.toContain('onclick');
+    });
+
+    it('should strip event handlers without leaving raw script leakage', () => {
+        const dirty = '<img src=x onerror=alert(1)><b>ok</b>';
+        const result = sanitizeRichText(dirty);
+        expect(result).toContain('<b>ok</b>');
+        expect(result).not.toContain('onerror');
+        expect(result).not.toContain('<img');
     });
 
     it('should handle null and undefined', () => {
@@ -229,7 +247,7 @@ describe('sanitizeEducationData', () => {
         const input = {
             institution: '<b>University</b>',
             degree: 'BS',
-            field: '<script>CS</script>',
+            field: '<b>CS</b>',
             gpa: '3.5',
             honors: ['<b>Dean List</b>'],
             startDate: '2016-09-01',
@@ -250,7 +268,7 @@ describe('sanitizeSkillData', () => {
     it('should sanitize all fields', () => {
         const input = {
             name: '<b>JavaScript</b>',
-            category: '<script>Programming</script>',
+            category: '<i>Programming</i>',
             proficiency: 'Expert',
             yearsExp: '5',
         };
@@ -269,7 +287,7 @@ describe('sanitizeCoverLetterData', () => {
         const input = {
             content: '<script>alert(1)</script><b>Cover</b> letter',
             jobTitle: '<b>Developer</b>',
-            companyName: '<script>Acme</script>',
+            companyName: '<b>Acme</b>',
         };
 
         const result = sanitizeCoverLetterData(input);
@@ -331,12 +349,12 @@ describe('sanitizeRequestBody', () => {
 
     it('should sanitize arrays of strings', () => {
         const input = {
-            items: ['<b>Item 1</b>', '<script>Item 2</script>'],
+            items: ['<b>Item 1</b>', '<i>Item 2</i>', '<script>evil</script>safe'],
         };
 
         const result = sanitizeRequestBody(input);
 
-        expect(result.items).toEqual(['Item 1', 'Item 2']);
+        expect(result.items).toEqual(['Item 1', 'Item 2', 'safe']);
     });
 });
 

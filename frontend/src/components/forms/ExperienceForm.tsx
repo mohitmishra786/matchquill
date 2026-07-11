@@ -1,6 +1,9 @@
 /**
  * Experience Form Component
  * Form for adding/editing work experience
+ *
+ * AI Enhance goes through /api/ai/enhance-bullet (server-authenticated proxy).
+ * Never mint backend JWTs or call AUTH_SECRET from the browser.
  */
 
 'use client';
@@ -8,8 +11,13 @@
 import { useState } from 'react';
 import type { Experience } from '@/types';
 import { createLogger } from '@/lib/logger';
-import { auth } from '@/lib/auth';
-import { generateBackendToken } from '@/lib/jwt';
+import {
+    assertAuthenticatedResponse,
+    AuthenticationError,
+    isAuthenticationError,
+    redirectToLogin,
+} from '@/lib/auth-errors';
+import { sanitizeExperienceData, sanitizeText, sanitizeRichText } from '@/lib/sanitization';
 
 const logger = createLogger({ component: 'ExperienceForm' });
 
@@ -20,7 +28,19 @@ interface ExperienceFormProps {
 }
 
 export default function ExperienceForm({ experience, onSubmit, onCancel }: ExperienceFormProps) {
-    const [formData, setFormData] = useState({
+    interface ExperienceFormState {
+        company: string;
+        title: string;
+        location: string;
+        startDate: string;
+        endDate: string;
+        current: boolean;
+        description: string;
+        highlights: string;
+        keywords: string;
+    }
+
+    const [formData, setFormData] = useState<ExperienceFormState>({
         company: experience?.company || '',
         title: experience?.title || '',
         location: experience?.location || '',
@@ -31,10 +51,18 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
         highlights: experience?.highlights?.join('\n') || '',
         keywords: experience?.keywords?.join(', ') || '',
     });
-    const [targetJD, setTargetJD] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [isEnhancing, setIsEnhancing] = useState(false);
-    const [error, setError] = useState('');
+    const [targetJD, setTargetJD] = useState<string>('');
+    const [loading, setLoading] = useState<boolean>(false);
+    const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
+    const [error, setError] = useState<string>('');
+
+    const handleAuthFailure = (err: unknown): void => {
+        logger.warn('[ExperienceForm] Authentication failure', {
+            message: err instanceof Error ? err.message : String(err),
+        });
+        setError('Your session has expired. Redirecting to login…');
+        redirectToLogin();
+    };
 
     const handleAIEnhance = async () => {
         if (!formData.highlights.trim()) {
@@ -45,41 +73,54 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
         setIsEnhancing(true);
         setError('');
         try {
-            const session = await auth();
-            if (!session?.user?.id) {
-                throw new Error('Not authenticated');
-            }
+            const bullets = formData.highlights.split('\n').filter((b) => b.trim());
+            const enhancedBullets: string[] = [];
 
-            const backendToken = await generateBackendToken(session.user.id, session.user.email || undefined);
-
-            const bullets = formData.highlights.split('\n').filter(b => b.trim());
-            const enhancedBullets = [];
+            const sanitizedJD = targetJD.trim()
+                ? sanitizeRichText(targetJD)
+                : undefined;
 
             for (const bullet of bullets) {
-                const res = await fetch('/api/py/ai/enhance-bullet', {
+                // Server route validates session and attaches backend JWT
+                const res = await fetch('/api/ai/enhance-bullet', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${backendToken}`,
                     },
                     body: JSON.stringify({
-                        bullet,
-                        job_description: targetJD || undefined
+                        bullet: sanitizeText(bullet),
+                        job_description: sanitizedJD || undefined,
                     }),
                 });
-                const data = await res.json();
-                if (res.ok) {
+
+                await assertAuthenticatedResponse(res);
+
+                const data = (await res.json()) as {
+                    enhanced_bullet?: string;
+                    error?: string;
+                };
+
+                if (res.ok && data.enhanced_bullet) {
                     enhancedBullets.push(data.enhanced_bullet);
                 } else {
+                    // Keep original bullet on partial failure; surface soft error once
+                    logger.warn('[ExperienceForm] Bullet enhance failed', {
+                        status: res.status,
+                        error: data.error,
+                    });
                     enhancedBullets.push(bullet);
                 }
             }
 
             setFormData({
                 ...formData,
-                highlights: enhancedBullets.join('\n')
+                highlights: enhancedBullets.join('\n'),
             });
         } catch (err) {
+            if (isAuthenticationError(err) || err instanceof AuthenticationError) {
+                handleAuthFailure(err);
+                return;
+            }
             logger.error('Failed to enhance bullets', { err });
             setError('AI enhancement failed. Please try again.');
         } finally {
@@ -89,13 +130,12 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
 
     logger.debug('[ExperienceForm] Initialized', {
         isEdit: !!experience?.id,
-        experienceId: experience?.id
+        experienceId: experience?.id,
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validation
         if (!formData.company.trim() || !formData.title.trim() || !formData.startDate) {
             setError('Please fill in all required fields');
             logger.warn('[ExperienceForm] Validation failed - missing required fields');
@@ -107,16 +147,33 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
         setError('');
 
         try {
-            await onSubmit({
+            const sanitized = sanitizeExperienceData({
                 ...formData,
+                highlights: formData.highlights.split('\n').filter((h) => h.trim()),
+                keywords: formData.keywords
+                    .split(',')
+                    .map((k) => k.trim())
+                    .filter(Boolean),
+            });
+
+            await onSubmit({
+                company: sanitized.company,
+                title: sanitized.title,
+                location: sanitized.location,
+                description: sanitized.description,
+                highlights: sanitized.highlights,
+                keywords: sanitized.keywords,
                 startDate: formData.startDate,
-                endDate: formData.current ? undefined : formData.endDate,
-                highlights: formData.highlights.split('\n').filter(h => h.trim()),
-                keywords: formData.keywords.split(',').map(k => k.trim()).filter(Boolean),
+                endDate: formData.current ? undefined : formData.endDate || undefined,
+                current: sanitized.current,
             });
             logger.endOperation('ExperienceForm:submit');
         } catch (err) {
             logger.failOperation('ExperienceForm:submit', err);
+            if (isAuthenticationError(err)) {
+                handleAuthFailure(err);
+                return;
+            }
             setError('Failed to save experience. Please try again.');
         } finally {
             setLoading(false);
@@ -124,22 +181,25 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                    <label htmlFor="exp-company" className="block text-sm font-medium text-gray-700 mb-1">Company</label>
                     <input
+                        id="exp-company"
                         type="text"
                         required
                         value={formData.company}
                         onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                        aria-invalid={error ? true : undefined}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="Company name"
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                    <label htmlFor="exp-title" className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
                     <input
+                        id="exp-title"
                         type="text"
                         required
                         value={formData.title}
@@ -151,8 +211,9 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                <label htmlFor="exp-location" className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                 <input
+                    id="exp-location"
                     type="text"
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
@@ -163,8 +224,9 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <label htmlFor="exp-start-date" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                     <input
+                        id="exp-start-date"
                         type="date"
                         required
                         value={formData.startDate}
@@ -173,8 +235,9 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <label htmlFor="exp-end-date" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                     <input
+                        id="exp-end-date"
                         type="date"
                         value={formData.endDate}
                         onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
@@ -187,17 +250,20 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
             <div className="flex items-center gap-2">
                 <input
                     type="checkbox"
-                    id="current"
+                    id="exp-current"
                     checked={formData.current}
                     onChange={(e) => setFormData({ ...formData, current: e.target.checked })}
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                 />
-                <label htmlFor="current" className="text-sm text-gray-700">I currently work here</label>
+                <label htmlFor="exp-current" className="text-sm text-gray-700">
+                    I currently work here
+                </label>
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label htmlFor="exp-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
+                    id="exp-description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows={3}
@@ -208,7 +274,7 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
 
             <div>
                 <div className="flex justify-between items-center mb-1">
-                    <label className="block text-sm font-medium text-gray-700">Key Achievements</label>
+                    <label htmlFor="exp-highlights" className="block text-sm font-medium text-gray-700">Key Achievements</label>
                     <button
                         type="button"
                         onClick={handleAIEnhance}
@@ -217,13 +283,24 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
                     >
                         {isEnhancing ? (
                             <>
-                                <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
                                 Enhancing...
                             </>
                         ) : (
                             <>
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                <svg
+                                    className="w-3.5 h-3.5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                                    />
                                 </svg>
                                 AI Enhance
                             </>
@@ -231,20 +308,24 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
                     </button>
                 </div>
                 <textarea
+                    id="exp-highlights"
                     value={formData.highlights}
                     onChange={(e) => setFormData({ ...formData, highlights: e.target.value })}
                     rows={4}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                     placeholder="Enter each achievement on a new line"
                 />
-                <p className="mt-1 text-xs text-gray-500">One achievement per line. Start with action verbs.</p>
+                <p id="exp-highlights-help" className="mt-1 text-xs text-gray-600">
+                    One achievement per line. Start with action verbs.
+                </p>
             </div>
 
             <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">
+                <label htmlFor="exp-target-jd" className="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">
                     Target Job Description (Optional for AI)
                 </label>
                 <textarea
+                    id="exp-target-jd"
                     value={targetJD}
                     onChange={(e) => setTargetJD(e.target.value)}
                     rows={2}
@@ -254,8 +335,9 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Keywords</label>
+                <label htmlFor="exp-keywords" className="block text-sm font-medium text-gray-700 mb-1">Keywords</label>
                 <input
+                    id="exp-keywords"
                     type="text"
                     value={formData.keywords}
                     onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
@@ -265,7 +347,9 @@ export default function ExperienceForm({ experience, onSubmit, onCancel }: Exper
             </div>
 
             {error && (
-                <p className="text-sm text-red-600">{error}</p>
+                <p className="text-sm text-red-600" role="alert" aria-live="assertive">
+                    {error}
+                </p>
             )}
 
             <div className="flex gap-3 pt-4">

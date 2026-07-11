@@ -52,7 +52,20 @@ def mock_resume_parser():
 
 
 @pytest.fixture
-def client(mock_resume_parser):
+def mock_db_auth():
+    """Mock DB user validation used by verify_auth_token_with_db."""
+    from app.middleware.auth import clear_db_auth_cache
+    clear_db_auth_cache()
+    mock_service = AsyncMock()
+    mock_service.validate_token.return_value = "test-user-id"
+    mock_service.close = AsyncMock()
+    with patch("app.services.profile_service.ProfileService", return_value=mock_service):
+        yield mock_service
+    clear_db_auth_cache()
+
+
+@pytest.fixture
+def client(mock_resume_parser, mock_db_auth):
     """Create test client with mocked dependencies."""
     with patch("app.routers.upload.resume_parser", mock_resume_parser):
         with TestClient(app) as c:
