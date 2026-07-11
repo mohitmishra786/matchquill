@@ -155,12 +155,34 @@ class TestSanitizeHeaders:
         result = sanitize_headers(headers)
 
         assert result is not None
-        assert result["authorization"] == "***"
-        assert result["cookie"] == "***"
+        # Presence flags only for sensitive headers — never raw values
+        assert result.get("has_authorization") == "true"
+        assert result.get("has_cookie") == "true"
+        assert "authorization" not in result or result.get("authorization") == "***"
+        assert "cookie" not in result or result.get("cookie") == "***"
         assert result["user-agent"] == "pytest"
         assert result["content-type"] == "application/json"
         assert "secret-jwt" not in str(result)
         assert "session=xyz" not in str(result)
+
+    def test_drops_non_allowlisted_headers(self):
+        headers = Headers({
+            "x-custom-evil\ninjected": "value",
+            "user-agent": "ok",
+        })
+        result = sanitize_headers(headers)
+        assert result is not None
+        assert result == {"user-agent": "ok"}
+        assert "injected" not in str(result)
+
+    def test_strips_newlines_from_values(self):
+        headers = Headers({
+            "user-agent": "Mozilla\r\nInjected-Header: evil",
+        })
+        result = sanitize_headers(headers)
+        assert result is not None
+        assert "\n" not in result["user-agent"]
+        assert "\r" not in result["user-agent"]
 
     def test_none_headers(self):
         assert sanitize_headers(None) is None

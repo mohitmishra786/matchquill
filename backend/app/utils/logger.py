@@ -73,6 +73,20 @@ def is_sensitive_key(key: str, sensitive_keys: Optional[set] = None) -> bool:
     return False
 
 
+# Allowlisted request headers that may be reflected in logs (values still scrubbed).
+# Anything not in this set is omitted entirely — never log arbitrary user-controlled keys.
+_LOGGABLE_HEADER_NAMES: frozenset = frozenset({
+    "user-agent",
+    "content-type",
+    "content-length",
+    "accept",
+    "accept-language",
+    "x-request-id",
+    "x-forwarded-for",
+    "host",
+})
+
+
 def _safe_log_key(key: str) -> str:
     """
     Normalize a user-influenced key for safe structured logging.
@@ -87,19 +101,38 @@ def _safe_log_key(key: str) -> str:
 
 
 def _safe_log_value(value: Any, *, max_len: int = 100) -> str:
-    """Coerce values to a single-line, length-capped string for logs."""
-    str_value = str(value).replace("\r", " ").replace("\n", " ").replace("\x00", "")
-    if len(str_value) > max_len:
-        return str_value[:max_len] + "..."
-    return str_value
+    """
+    Coerce values to a single-line, length-capped string for logs.
+
+    Rebuilds the string character-by-character with a printable ASCII whitelist
+    so tainted newline/control sequences cannot reach log sinks (CodeQL log-injection).
+    """
+    # Use only the string type constructor on a filtered sequence — never pass
+    # the raw user string through to a logger.
+    source = value if isinstance(value, str) else repr(value)
+    out_chars: list = []
+    for ch in source:
+        code = ord(ch)
+        # Printable ASCII excluding CR/LF/TAB control (space..~)
+        if 32 <= code <= 126:
+            out_chars.append(ch)
+        else:
+            out_chars.append("?")
+        if len(out_chars) >= max_len:
+            out_chars.append("...")
+            break
+    return "".join(out_chars)
 
 
 def sanitize_headers(headers: Any) -> Optional[Dict[str, str]]:
     """
     Sanitize HTTP headers for safe logging.
 
-    Never logs Authorization, Cookie, or other credential-bearing headers.
-    Header names from the request are normalized before use as log keys.
+    Security:
+    - Never logs Authorization, Cookie, or other credential-bearing values
+    - Only allowlisted header *names* are included (blocks key-based log injection)
+    - Values are rebuilt via printable-ASCII whitelist
+    - Sensitive allowlisted names are reported as presence flags only
     """
     if not headers:
         return None
@@ -109,13 +142,27 @@ def sanitize_headers(headers: Any) -> Optional[Dict[str, str]]:
     except (TypeError, ValueError):
         return None
 
-    sanitized: Dict[str, str] = {}
+    # Lower-case map once; keys compared only against our fixed allowlist
+    lower_map: Dict[str, Any] = {}
     for key, value in items:
-        safe_key = _safe_log_key(str(key))
-        if is_sensitive_key(str(key)) or is_sensitive_key(safe_key):
-            sanitized[safe_key] = "***"
-        else:
-            sanitized[safe_key] = _safe_log_value(value)
+        lower_map[str(key).lower()] = value
+
+    sanitized: Dict[str, str] = {}
+
+    # Presence-only flags for sensitive headers (never echo values)
+    if any(k in lower_map for k in ("authorization", "proxy-authorization")):
+        sanitized["has_authorization"] = "true"
+    if any(k in lower_map for k in ("cookie", "set-cookie")):
+        sanitized["has_cookie"] = "true"
+
+    for name in _LOGGABLE_HEADER_NAMES:
+        if name not in lower_map:
+            continue
+        if is_sensitive_key(name):
+            sanitized[name] = "***"
+            continue
+        sanitized[name] = _safe_log_value(lower_map[name])
+
     return sanitized if sanitized else None
 
 
