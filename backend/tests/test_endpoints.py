@@ -80,7 +80,7 @@ def test_compile_resume(client, mock_profile_service, mock_compiler, sample_prof
         )
     )
     
-    response = client.post("/compile", json={
+    response = client.post("/api/py/compile", json={
         "authToken": "valid_token",
         "jobDescription": "A" * 60 # > 50 chars
     })
@@ -90,7 +90,7 @@ def test_compile_resume(client, mock_profile_service, mock_compiler, sample_prof
     assert response.json()["pdfBase64"] == "base64pdf"
 
 def test_compile_resume_invalid_jd(client):
-    response = client.post("/compile", json={
+    response = client.post("/api/py/compile", json={
         "authToken": "token",
         "jobDescription": "Short"
     })
@@ -107,7 +107,7 @@ def test_generate_cover_letter(client, mock_profile_service, mock_cl_generator, 
         profile_fields_used=["experiences"]
     )
     
-    response = client.post("/cover-letter", json={
+    response = client.post("/api/py/cover-letter", json={
         "authToken": "token",
         "jobDescription": "A" * 60,
         "tone": "professional"

@@ -15,29 +15,43 @@ describe('SSRF Protection', () => {
         });
 
         it('should return valid backend URL when BACKEND_URL is configured', async () => {
-            process.env.BACKEND_URL = 'http://backend:8000';
+            process.env.BACKEND_URL = 'http://backend:8000/api/py';
 
             const { getBackendUrl } = await import('@/lib/backend-url');
             const result = getBackendUrl('/upload/resume');
 
-            expect(result).toBe('http://backend:8000/upload/resume');
+            expect(result).toBe('http://backend:8000/api/py/upload/resume');
         });
 
         it('should strip trailing slash from BACKEND_URL', async () => {
-            process.env.BACKEND_URL = 'http://backend:8000/';
+            process.env.BACKEND_URL = 'http://backend:8000/api/py/';
 
             const { getBackendUrl } = await import('@/lib/backend-url');
             const result = getBackendUrl('/upload/resume');
 
-            expect(result).toBe('http://backend:8000/upload/resume');
+            expect(result).toBe('http://backend:8000/api/py/upload/resume');
         });
 
         it('should throw error when BACKEND_URL is not configured', async () => {
             delete process.env.BACKEND_URL;
+            delete process.env.VERCEL_URL;
 
             const { getBackendUrl } = await import('@/lib/backend-url');
 
-            expect(() => getBackendUrl('/upload/resume')).toThrow('BACKEND_URL environment variable is not configured');
+            expect(() => getBackendUrl('/upload/resume')).toThrow(
+                'BACKEND_URL environment variable is not configured'
+            );
+        });
+
+        it('should derive backend URL from VERCEL_URL when BACKEND_URL is unset', async () => {
+            delete process.env.BACKEND_URL;
+            process.env.VERCEL_URL = 'cv-wiz.vercel.app';
+            process.env.VERCEL_ENV = 'production';
+
+            const { getBackendUrl } = await import('@/lib/backend-url');
+            const result = getBackendUrl('/upload/resume');
+
+            expect(result).toBe('https://cv-wiz.vercel.app/api/py/upload/resume');
         });
 
         it('should throw error when BACKEND_URL has invalid format', async () => {

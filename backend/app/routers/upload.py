@@ -36,7 +36,12 @@ ALLOWED_TYPES = {
 }
 # Also allow by extension for files where MIME type detection fails
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt", ".md", ".markdown"}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+# Vercel serverless body limit is 4.5 MB (https://vercel.com/docs/functions/limitations).
+# Default to 4 MB on Vercel; Docker/local can override via MAX_UPLOAD_BYTES.
+_DEFAULT_MAX_UPLOAD = (
+    4 * 1024 * 1024 if os.getenv("VERCEL") else 10 * 1024 * 1024
+)
+MAX_FILE_SIZE = int(os.getenv("MAX_UPLOAD_BYTES", str(_DEFAULT_MAX_UPLOAD)))
 
 
 def validate_filename(filename: str, request_id: str) -> None:

@@ -3,8 +3,14 @@
  * Prefer importing from here over hardcoding values in components.
  */
 
-/** Resume / cover letter upload */
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
+/**
+ * Resume / cover letter upload.
+ * Vercel Functions cap request bodies at 4.5 MB — keep a safe margin.
+ * Override via NEXT_PUBLIC_MAX_UPLOAD_BYTES (e.g. 10485760 for Docker backend).
+ */
+export const MAX_UPLOAD_BYTES = Number(
+    process.env.NEXT_PUBLIC_MAX_UPLOAD_BYTES ?? 4 * 1024 * 1024
+);
 export const ALLOWED_RESUME_EXTENSIONS = [
     '.pdf',
     '.docx',

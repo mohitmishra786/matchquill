@@ -19,8 +19,7 @@ class TestCORSConfiguration:
 
     def test_cors_rejects_star_for_untrusted_origin(self, client):
         """Untrusted Origin must not receive Access-Control-Allow-Origin: *."""
-        response = client.get(
-            "/",
+        response = client.get("/api/py/",
             headers={"Origin": "https://malicious.example"},
         )
         assert response.status_code == 200
@@ -28,8 +27,7 @@ class TestCORSConfiguration:
     
     def test_cors_preflight_request(self, client):
         """Test CORS preflight request handling."""
-        response = client.options(
-            "/",
+        response = client.options("/api/py/",
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "POST",
@@ -43,8 +41,7 @@ class TestCORSConfiguration:
     
     def test_cors_headers_present(self, client):
         """Test that CORS headers are present in responses."""
-        response = client.get(
-            "/",
+        response = client.get("/api/py/",
             headers={"Origin": "http://localhost:3000"},
         )
         
@@ -55,7 +52,7 @@ class TestCORSConfiguration:
     
     def test_security_headers_present(self, client):
         """Test that security headers are present."""
-        response = client.get("/")
+        response = client.get("/api/py/")
         
         # Check security headers added by SecurityMiddleware
         assert response.headers.get("X-Content-Type-Options") == "nosniff"
@@ -72,8 +69,7 @@ class TestCORSNoWildcardCredentials:
         assert all(o.startswith("http") for o in allowed_origins)
 
     def test_disallowed_origin_not_reflected(self, client):
-        response = client.get(
-            "/",
+        response = client.get("/api/py/",
             headers={"Origin": "https://evil.example.com"},
         )
         # Starlette CORS should not echo disallowed origins

@@ -169,6 +169,20 @@ class Settings(BaseSettings):
         """Get the effective frontend URL for CORS."""
         return self.frontend_url or self.nextauth_url
 
+    @property
+    def effective_frontend_api_url(self) -> str:
+        """
+        Base URL for server-side profile fetches (Next.js /api routes).
+        On unified Vercel deploys, defaults to https://{VERCEL_URL}.
+        """
+        if self.frontend_api_url:
+            return self.frontend_api_url.rstrip("/")
+        vercel_url = os.getenv("VERCEL_URL", "").strip()
+        if vercel_url:
+            return f"https://{vercel_url}"
+        effective = self.effective_frontend_url
+        return effective.rstrip("/") if effective else ""
+
     def is_feature_enabled(self, flag: str) -> bool:
         """Check if a named feature flag is enabled via FEATURE_FLAGS env."""
         if not self.feature_flags or not flag:

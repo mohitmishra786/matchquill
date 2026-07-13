@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
+from app.constants import API_PREFIX
 from app.utils.rate_limiter import apply_rate_limiting  # noqa: E402
 from app.middleware.asgi_security import SecurityHeadersASGIMiddleware  # noqa: E402
 from app.utils.redis_cache import redis_client  # noqa: E402
@@ -165,10 +166,9 @@ app = FastAPI(
     description="Career Resume Compiler - Generate tailored resumes and cover letters",
     version="1.0.0",
     lifespan=lifespan,
-    root_path="/api/py",  # For Vercel deployment with Next.js rewrites
-    docs_url=None if _is_prod else "/docs",
-    redoc_url=None if _is_prod else "/redoc",
-    openapi_url=None if _is_prod else "/openapi.json",
+    docs_url=None if _is_prod else f"{API_PREFIX}/docs",
+    redoc_url=None if _is_prod else f"{API_PREFIX}/redoc",
+    openapi_url=None if _is_prod else f"{API_PREFIX}/openapi.json",
 )
 
 # Initialize rate limiting BEFORE importing routers
@@ -186,7 +186,11 @@ app.add_middleware(SecurityHeadersASGIMiddleware)
 # Exempt health check and auth-related endpoints
 app.add_middleware(
     CSRFProtectionMiddleware,
-    exempt_paths=["/health", "/", "/api/py/health", "/api/py/"]
+    exempt_paths=[
+        f"{API_PREFIX}/health",
+        f"{API_PREFIX}/",
+        f"{API_PREFIX}",
+    ],
 )
 
 # Configure CORS
@@ -195,11 +199,11 @@ settings = get_settings()
 
 # Build allowed origins list - only specific domains, no wildcards
 _cors_origins = [
-    settings.effective_frontend_url,  # Production frontend URL
-    settings.nextauth_url,  # Auth callback URL
-    "https://cv-wiz-psi.vercel.app",  # Explicit production frontend
-    "http://localhost:3000",  # Local development
-    "http://localhost:3001",  # Local development alternative
+    settings.effective_frontend_url,
+    settings.nextauth_url,
+    settings.effective_frontend_api_url,
+    "http://localhost:3000",
+    "http://localhost:3001",
 ]
 
 # Filter out empty strings and deduplicate
@@ -222,21 +226,21 @@ app.add_middleware(
     max_age=600,  # Cache preflight requests for 10 minutes
 )
 
-# Include routers (no prefix - frontend adds /api/py via getBackendUrl)
-app.include_router(compile.router, tags=["Resume"])
-app.include_router(cover_letter.router, tags=["Cover Letter"])
-app.include_router(upload.router, tags=["Upload"])
-app.include_router(ai.router, tags=["AI"])
+# Routes include API_PREFIX — Vercel forwards the full path (/api/py/...) to the function.
+app.include_router(compile.router, prefix=API_PREFIX, tags=["Resume"])
+app.include_router(cover_letter.router, prefix=API_PREFIX, tags=["Cover Letter"])
+app.include_router(upload.router, prefix=API_PREFIX, tags=["Upload"])
+app.include_router(ai.router, prefix=API_PREFIX, tags=["AI"])
 
 
-@app.get("/")
+@app.get(f"{API_PREFIX}/")
 async def root():
     """Health check endpoint."""
     logger.debug("[HEALTH] Root endpoint called")
     return {"status": "healthy", "service": "cv-wiz-api", "version": "1.0.0"}
 
 
-@app.get("/health")
+@app.get(f"{API_PREFIX}/health")
 async def health_check():
     """Detailed health check with logging."""
     logger.info("[HEALTH] Health check requested")

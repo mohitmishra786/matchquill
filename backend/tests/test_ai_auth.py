@@ -67,7 +67,7 @@ class TestAIAuthentication:
     def test_enhance_bullet_without_auth(self, client):
         """Test that enhance-bullet fails without authentication."""
         response = client.post(
-            "/ai/enhance-bullet",
+            "/api/py/ai/enhance-bullet",
             json={"bullet": "Led a team of developers"},
         )
         
@@ -77,7 +77,7 @@ class TestAIAuthentication:
     def test_enhance_bullet_with_valid_auth(self, client, valid_token, mock_groq_client):
         """Test that enhance-bullet succeeds with valid authentication."""
         response = client.post(
-            "/ai/enhance-bullet",
+            "/api/py/ai/enhance-bullet",
             json={"bullet": "Led a team of developers"},
             headers={"Authorization": f"Bearer {valid_token}"},
         )
@@ -89,7 +89,7 @@ class TestAIAuthentication:
     def test_interview_prep_without_auth(self, client):
         """Test that interview-prep fails without authentication."""
         response = client.post(
-            "/ai/interview-prep",
+            "/api/py/ai/interview-prep",
             json={"candidate_info": "Software engineer with 5 years experience"},
         )
         
@@ -98,7 +98,7 @@ class TestAIAuthentication:
     def test_interview_prep_with_valid_auth(self, client, valid_token, mock_groq_client):
         """Test that interview-prep succeeds with valid authentication."""
         response = client.post(
-            "/ai/interview-prep",
+            "/api/py/ai/interview-prep",
             json={"candidate_info": "Software engineer with 5 years experience"},
             headers={"Authorization": f"Bearer {valid_token}"},
         )
@@ -110,7 +110,7 @@ class TestAIAuthentication:
     def test_suggest_skills_without_auth(self, client):
         """Test that suggest-skills fails without authentication."""
         response = client.post(
-            "/ai/suggest-skills",
+            "/api/py/ai/suggest-skills",
             json={"experience_text": "Developed web applications using React and Node.js"},
         )
         
@@ -119,7 +119,7 @@ class TestAIAuthentication:
     def test_suggest_skills_with_valid_auth(self, client, valid_token, mock_groq_client):
         """Test that suggest-skills succeeds with valid authentication."""
         response = client.post(
-            "/ai/suggest-skills",
+            "/api/py/ai/suggest-skills",
             json={"experience_text": "Developed web applications using React and Node.js"},
             headers={"Authorization": f"Bearer {valid_token}"},
         )
@@ -131,7 +131,7 @@ class TestAIAuthentication:
     def test_suggest_skills_validation(self, client, valid_token):
         """Test that suggest-skills validates input length."""
         response = client.post(
-            "/ai/suggest-skills",
+            "/api/py/ai/suggest-skills",
             json={"experience_text": "Too short"},
             headers={"Authorization": f"Bearer {valid_token}"},
         )
@@ -146,7 +146,7 @@ class TestAIAuthentication:
         clear_db_auth_cache()
 
         response = client.post(
-            "/ai/enhance-bullet",
+            "/api/py/ai/enhance-bullet",
             json={"bullet": "Led a team of developers"},
             headers={"Authorization": f"Bearer {valid_token}"},
         )

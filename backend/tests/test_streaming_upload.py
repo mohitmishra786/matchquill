@@ -72,7 +72,7 @@ class TestStreamingUpload:
             
             # Check that parse_file was called with is_file_path=True
             response = client.post(
-                "/upload/resume",
+                "/api/py/upload/resume",
                 files=files,
                 data=data,
                 headers=headers
@@ -102,7 +102,7 @@ class TestStreamingUpload:
         headers = {"Authorization": f"Bearer {valid_token}"}
         
         response = client.post(
-            "/upload/resume",
+            "/api/py/upload/resume",
             files=files,
             data=data,
             headers=headers
@@ -166,7 +166,7 @@ class TestTempFileCleanup:
                 }
                 
                 response = client.post(
-                    "/upload/resume",
+                    "/api/py/upload/resume",
                     files=files,
                     data=data,
                     headers=headers

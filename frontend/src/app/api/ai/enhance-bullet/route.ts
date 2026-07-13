@@ -22,10 +22,9 @@ function resolveEnhanceEndpoint(): string {
         return getBackendUrl('/ai/enhance-bullet');
     } catch {
         // Local/dev fallback when BACKEND_URL is not configured
-        const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(
-            /\/$/,
-            ''
-        );
+        const base = (
+            process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/py'
+        ).replace(/\/$/, '');
         return `${base}/ai/enhance-bullet`;
     }
 }
