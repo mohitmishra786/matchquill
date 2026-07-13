@@ -54,7 +54,7 @@ class TestRateLimitEndpoints:
         """Test that compile endpoint includes rate limit headers."""
         # This test verifies the endpoint is rate-limited
         # Actual rate limiting is handled by slowapi
-        response = client.post("/compile", json={
+        response = client.post("/api/py/compile", json={
             "authToken": "invalid_token",
             "jobDescription": "Test job description that is long enough to pass validation. " * 5,
         })
@@ -64,7 +64,7 @@ class TestRateLimitEndpoints:
 
     def test_cover_letter_endpoint_rate_limit_headers(self, client: TestClient):
         """Test that cover letter endpoint includes rate limit headers."""
-        response = client.post("/cover-letter", json={
+        response = client.post("/api/py/cover-letter", json={
             "authToken": "invalid_token",
             "jobDescription": "Test job description that is long enough to pass validation. " * 5,
         })
@@ -76,12 +76,12 @@ class TestRateLimitEndpoints:
         """Test that templates endpoint allows many requests."""
         # Make multiple requests
         for _ in range(5):
-            response = client.get("/templates")
+            response = client.get("/api/py/templates")
             assert response.status_code == 200
 
     def test_job_description_validation_short(self, client: TestClient):
         """Test that short job descriptions are rejected."""
-        response = client.post("/compile", json={
+        response = client.post("/api/py/compile", json={
             "authToken": "some_token",
             "jobDescription": "Short",  # Too short
         })
@@ -98,7 +98,7 @@ class TestRateLimitEndpoints:
 
     def test_job_description_validation_long(self, client: TestClient):
         """Test that very long job descriptions are rejected."""
-        response = client.post("/compile", json={
+        response = client.post("/api/py/compile", json={
             "authToken": "some_token",
             "jobDescription": "A" * 50001,  # Too long
         })
@@ -115,7 +115,7 @@ class TestRateLimitEndpoints:
 
     def test_job_description_validation_valid_length(self, client: TestClient):
         """Test that valid length job descriptions pass validation."""
-        response = client.post("/compile", json={
+        response = client.post("/api/py/compile", json={
             "authToken": "invalid_token",  # Will fail auth but pass length validation
             "jobDescription": "This is a valid job description. " * 10,
         })
@@ -160,19 +160,19 @@ class TestAIRateLimitedEndpoints:
     """Verify AI routes enforce rate limiting configuration and auth."""
 
     def test_enhance_bullet_requires_auth(self, client: TestClient):
-        response = client.post("/ai/enhance-bullet", json={"bullet": "Built features"})
+        response = client.post("/api/py/ai/enhance-bullet", json={"bullet": "Built features"})
         assert response.status_code == 401
 
     def test_interview_prep_requires_auth(self, client: TestClient):
         response = client.post(
-            "/ai/interview-prep",
+            "/api/py/ai/interview-prep",
             json={"candidate_info": "Senior engineer with 5 years experience"},
         )
         assert response.status_code == 401
 
     def test_suggest_skills_requires_auth(self, client: TestClient):
         response = client.post(
-            "/ai/suggest-skills",
+            "/api/py/ai/suggest-skills",
             json={"experience_text": "Built distributed systems in Python"},
         )
         assert response.status_code == 401

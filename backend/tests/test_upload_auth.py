@@ -78,7 +78,7 @@ class TestUploadAuthentication:
     def test_upload_resume_without_auth(self, client):
         """Test that upload fails without authentication."""
         response = client.post(
-            "/upload/resume",
+            "/api/py/upload/resume",
             files={"file": ("test.pdf", b"PDF content", "application/pdf")},
         )
         
@@ -88,7 +88,7 @@ class TestUploadAuthentication:
     def test_upload_resume_with_valid_auth(self, client, valid_token, mock_resume_parser):
         """Test that upload succeeds with valid authentication."""
         response = client.post(
-            "/upload/resume",
+            "/api/py/upload/resume",
             files={"file": ("test.pdf", b"PDF content", "application/pdf")},
             headers={"Authorization": f"Bearer {valid_token}"},
         )
@@ -101,7 +101,7 @@ class TestUploadAuthentication:
     def test_upload_resume_with_invalid_token(self, client):
         """Test that upload fails with invalid token."""
         response = client.post(
-            "/upload/resume",
+            "/api/py/upload/resume",
             files={"file": ("test.pdf", b"PDF content", "application/pdf")},
             headers={"Authorization": "Bearer invalid-token"},
         )
@@ -112,7 +112,7 @@ class TestUploadAuthentication:
     def test_upload_resume_with_expired_token(self, client, expired_token):
         """Test that upload fails with expired token."""
         response = client.post(
-            "/upload/resume",
+            "/api/py/upload/resume",
             files={"file": ("test.pdf", b"PDF content", "application/pdf")},
             headers={"Authorization": f"Bearer {expired_token}"},
         )
@@ -126,7 +126,7 @@ class TestParseResumeAuthentication:
     def test_parse_resume_without_auth(self, client):
         """Test that parse-resume fails without authentication."""
         response = client.post(
-            "/parse-resume",
+            "/api/py/parse-resume",
             files={"file": ("test.pdf", b"PDF content", "application/pdf")},
         )
         
@@ -135,7 +135,7 @@ class TestParseResumeAuthentication:
     def test_parse_resume_with_valid_auth(self, client, valid_token):
         """Test that parse-resume succeeds with valid authentication."""
         response = client.post(
-            "/parse-resume",
+            "/api/py/parse-resume",
             files={"file": ("test.pdf", b"PDF content", "application/pdf")},
             headers={"Authorization": f"Bearer {valid_token}"},
         )
@@ -150,7 +150,7 @@ class TestParseCoverLetterAuthentication:
     def test_parse_cover_letter_without_auth(self, client):
         """Test that parse-cover-letter fails without authentication."""
         response = client.post(
-            "/parse-cover-letter",
+            "/api/py/parse-cover-letter",
             files={"file": ("test.pdf", b"PDF content", "application/pdf")},
         )
         
@@ -159,7 +159,7 @@ class TestParseCoverLetterAuthentication:
     def test_parse_cover_letter_with_valid_auth(self, client, valid_token):
         """Test that parse-cover-letter succeeds with valid authentication."""
         response = client.post(
-            "/parse-cover-letter",
+            "/api/py/parse-cover-letter",
             files={"file": ("test.pdf", b"PDF content", "application/pdf")},
             headers={"Authorization": f"Bearer {valid_token}"},
         )
@@ -174,7 +174,7 @@ class TestUploadValidation:
     def test_upload_invalid_file_type(self, client, valid_token):
         """Test that invalid file types are rejected."""
         response = client.post(
-            "/upload/resume",
+            "/api/py/upload/resume",
             files={"file": ("test.exe", b"malicious content", "application/octet-stream")},
             headers={"Authorization": f"Bearer {valid_token}"},
         )
@@ -185,7 +185,7 @@ class TestUploadValidation:
     def test_upload_empty_file(self, client, valid_token):
         """Test that empty files are rejected."""
         response = client.post(
-            "/upload/resume",
+            "/api/py/upload/resume",
             files={"file": ("test.pdf", b"", "application/pdf")},
             headers={"Authorization": f"Bearer {valid_token}"},
         )
@@ -199,7 +199,7 @@ class TestUploadValidation:
         large_content = b"x" * (11 * 1024 * 1024)
         
         response = client.post(
-            "/upload/resume",
+            "/api/py/upload/resume",
             files={"file": ("test.pdf", large_content, "application/pdf")},
             headers={"Authorization": f"Bearer {valid_token}"},
         )

@@ -6,15 +6,15 @@
 // Environment presets
 const ENV_PRESETS = {
     development: {
-        apiBaseUrl: 'http://localhost:8000/api',
+        apiBaseUrl: 'http://localhost:8000/api/py',
         frontendUrl: 'http://localhost:3000',
     },
     staging: {
-        apiBaseUrl: 'https://staging.cv-wiz.vercel.app/api',
+        apiBaseUrl: 'https://staging.cv-wiz.vercel.app/api/py',
         frontendUrl: 'https://staging.cv-wiz.vercel.app',
     },
     production: {
-        apiBaseUrl: 'https://cv-wiz.vercel.app/api',
+        apiBaseUrl: 'https://cv-wiz.vercel.app/api/py',
         frontendUrl: 'https://cv-wiz.vercel.app',
     },
 };

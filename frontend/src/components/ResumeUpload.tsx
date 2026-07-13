@@ -10,6 +10,7 @@
 import { useState, useRef, useId, useEffect, ChangeEvent, KeyboardEvent } from 'react';
 import { createLogger } from '@/lib/logger';
 import { sanitizeText } from '@/lib/sanitization';
+import { MAX_UPLOAD_BYTES } from '@/lib/constants';
 
 const logger = createLogger({ component: 'ResumeUpload' });
 
@@ -128,10 +129,10 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
             return;
         }
 
-        // Validate file size (max 10MB)
-        const maxSize = 10 * 1024 * 1024;
+        const maxSize = MAX_UPLOAD_BYTES;
         if (file.size > maxSize) {
-            const errorMsg = `File too large (${Math.round(file.size / 1024 / 1024)}MB). Maximum size is 10MB.`;
+            const maxMb = Math.round(maxSize / 1024 / 1024);
+            const errorMsg = `File too large (${Math.round(file.size / 1024 / 1024)}MB). Maximum size is ${maxMb}MB.`;
             logger.warn('[ResumeUpload] File too large', { size: file.size });
             setError(errorMsg);
             return;
@@ -398,7 +399,7 @@ export default function ResumeUpload({ onDataExtracted, type = 'resume' }: Resum
                                 Drop your {dropzoneLabel} here
                             </p>
                             <p className="text-sm text-gray-600">
-                                or click / press Enter to browse (PDF, DOCX, TXT, or MD, max 10MB)
+                                or click / press Enter to browse (PDF, DOCX, TXT, or MD, max {Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB)
                             </p>
                         </div>
                     </div>

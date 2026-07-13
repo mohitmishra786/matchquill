@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { createLogger } from '@/lib/logger';
 import { useToast } from '@/components/ui/ToastProvider';
-import { auth } from '@/lib/auth';
+import { useSession } from 'next-auth/react';
 import { generateBackendToken } from '@/lib/jwt';
 import { sanitizeRichText, sanitizeText } from '@/lib/sanitization';
 
@@ -27,6 +27,7 @@ interface Skill {
 
 export default function InterviewPrepPage() {
     const { error: toastError } = useToast();
+    const { data: session } = useSession();
     const [jobDescription, setJobDescription] = useState('');
     const [questions, setQuestions] = useState<Question[]>([]);
     const [loading, setLoading] = useState(false);
@@ -55,12 +56,11 @@ Skills: ${data.skills?.map((s: Skill) => s.name).join(', ')}
     const generateQuestions = async () => {
         setLoading(true);
         try {
-            const authSession = await auth();
-            if (!authSession?.user?.id) {
+            if (!session?.user?.id) {
                 throw new Error('Not authenticated');
             }
 
-            const backendToken = await generateBackendToken(authSession.user.id, authSession.user.email || undefined);
+            const backendToken = await generateBackendToken(session.user.id, session.user.email || undefined);
 
             const sanitizedJD = jobDescription.trim()
                 ? sanitizeRichText(jobDescription)

@@ -12,6 +12,7 @@ import { createRequestLogger, getOrCreateRequestId, logAuthOperation } from '@/l
 import { prisma } from '@/lib/prisma';
 import { generateBackendToken } from '@/lib/jwt';
 import { getBackendUrl } from '@/lib/backend-url';
+import { MAX_UPLOAD_BYTES } from '@/lib/constants';
 import { Prisma } from '@prisma/client';
 
 export async function POST(request: NextRequest) {
@@ -81,6 +82,24 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        if (file.size > MAX_UPLOAD_BYTES) {
+            const maxMb = Math.round(MAX_UPLOAD_BYTES / 1024 / 1024);
+            logger.warn('[Upload] File exceeds size limit', {
+                requestId,
+                userId,
+                filesize: file.size,
+                maxBytes: MAX_UPLOAD_BYTES,
+            });
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: `File too large. Maximum size is ${maxMb}MB.`,
+                    requestId,
+                },
+                { status: 400 }
+            );
+        }
+
         logger.info('[Upload] Processing file', {
             requestId,
             userId,
@@ -95,8 +114,6 @@ export async function POST(request: NextRequest) {
         backendFormData.append('file', file);
         backendFormData.append('file_type', fileType);
 
-        // Determine the backend URL for this request
-        // Path should be /upload/resume (FastAPI prefix is /api, rewrite adds /py)
         const uploadEndpoint = getBackendUrl('/upload/resume');
 
         // Forward to backend for parsing

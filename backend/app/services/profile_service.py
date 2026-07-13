@@ -106,7 +106,7 @@ class ProfileService:
     def __init__(self):
         """Initialize profile service with shared HTTP client."""
         settings = get_settings()
-        self.base_url = settings.frontend_api_url
+        self.base_url = settings.effective_frontend_api_url
         logger.info("ProfileService initialized", {"base_url": self.base_url})
     
     async def __aenter__(self):

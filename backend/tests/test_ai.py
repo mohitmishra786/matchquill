@@ -65,14 +65,14 @@ def client(mock_groq_client: AsyncMock, mock_db_auth: AsyncMock) -> Generator[Te
 
 def test_enhance_bullet_validation(client: TestClient) -> None:
     """Test validation error for enhance-bullet - requires auth first."""
-    response = client.post("/ai/enhance-bullet", json={})
+    response = client.post("/api/py/ai/enhance-bullet", json={})
     assert response.status_code == 401  # Auth required before validation
 
 
 def test_enhance_bullet_success(client: TestClient, valid_token: str, mock_groq_client: AsyncMock) -> None:
     """Test successful bullet enhancement with authentication."""
     response = client.post(
-        "/ai/enhance-bullet",
+        "/api/py/ai/enhance-bullet",
         json={"bullet": "Worked on stuff"},
         headers={"Authorization": f"Bearer {valid_token}"}
     )
@@ -84,7 +84,7 @@ def test_enhance_bullet_success(client: TestClient, valid_token: str, mock_groq_
 def test_interview_prep_success(client: TestClient, valid_token: str, mock_groq_client: AsyncMock) -> None:
     """Test successful interview prep generation with authentication."""
     response = client.post(
-        "/ai/interview-prep",
+        "/api/py/ai/interview-prep",
         json={"candidate_info": "Some info"},
         headers={"Authorization": f"Bearer {valid_token}"}
     )
@@ -97,7 +97,7 @@ def test_interview_prep_success(client: TestClient, valid_token: str, mock_groq_
 def test_suggest_skills_success(client: TestClient, valid_token: str, mock_groq_client: AsyncMock) -> None:
     """Test successful skill suggestion with authentication."""
     response = client.post(
-        "/ai/suggest-skills",
+        "/api/py/ai/suggest-skills",
         json={"experience_text": "I coded in Python"},
         headers={"Authorization": f"Bearer {valid_token}"}
     )
@@ -109,7 +109,7 @@ def test_suggest_skills_success(client: TestClient, valid_token: str, mock_groq_
 def test_suggest_skills_too_short(client: TestClient, valid_token: str) -> None:
     """Test validation for short text with authentication."""
     response = client.post(
-        "/ai/suggest-skills",
+        "/api/py/ai/suggest-skills",
         json={"experience_text": "Short"},
         headers={"Authorization": f"Bearer {valid_token}"}
     )

@@ -1,13 +1,14 @@
 """
-Vercel Serverless Function entrypoint for FastAPI
-Based on: github.com/digitros/nextjs-fastapi
+Vercel serverless fallback entrypoint for FastAPI.
+
+Primary production deploy uses Vercel Services (see vercel.json) with
+backend/app.main:app. This wrapper remains for local `vercel dev` and
+legacy single-function deployments.
 """
 
-import sys
 import os
+import sys
 
-# Add backend directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
-# Import the FastAPI app instance
-from app.main import app
+from app.main import app  # noqa: F401

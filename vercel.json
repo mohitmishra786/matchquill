@@ -1,14 +1,36 @@
 {
     "$schema": "https://openapi.vercel.sh/vercel.json",
+    "fluid": true,
+    "services": {
+        "frontend": {
+            "root": "frontend/",
+            "framework": "nextjs"
+        },
+        "backend": {
+            "root": "backend/",
+            "framework": "fastapi",
+            "entrypoint": "app.main:app",
+            "functions": {
+                "app/main.py": {
+                    "maxDuration": 300,
+                    "excludeFiles": "{tests/**,__tests__/**,**/*.test.py,**/test_*.py,venv/**,.venv/**,**/__pycache__/**,**/*.pyc,Dockerfile*,docs/**,*.md}"
+                }
+            }
+        }
+    },
     "rewrites": [
         {
             "source": "/api/py/:path*",
-            "destination": "/api/index.py"
+            "destination": { "service": "backend" }
+        },
+        {
+            "source": "/(.*)",
+            "destination": { "service": "frontend" }
         }
     ],
     "headers": [
         {
-            "source": "/api/(.*)",
+            "source": "/api/py/(.*)",
             "headers": [
                 {
                     "key": "Access-Control-Allow-Methods",

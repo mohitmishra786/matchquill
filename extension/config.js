@@ -6,22 +6,22 @@
 
 // Default configuration values
 const DEFAULT_CONFIG = {
-    API_BASE_URL: 'http://localhost:8000/api',
+    API_BASE_URL: 'http://localhost:8000/api/py',
     FRONTEND_URL: 'http://localhost:3000',
 };
 
 // Environment-specific configurations
 const ENV_CONFIGS = {
     development: {
-        API_BASE_URL: 'http://localhost:8000/api',
+        API_BASE_URL: 'http://localhost:8000/api/py',
         FRONTEND_URL: 'http://localhost:3000',
     },
     production: {
-        API_BASE_URL: 'https://cv-wiz.vercel.app/api',
+        API_BASE_URL: 'https://cv-wiz.vercel.app/api/py',
         FRONTEND_URL: 'https://cv-wiz.vercel.app',
     },
     staging: {
-        API_BASE_URL: 'https://staging.cv-wiz.vercel.app/api',
+        API_BASE_URL: 'https://staging.cv-wiz.vercel.app/api/py',
         FRONTEND_URL: 'https://staging.cv-wiz.vercel.app',
     },
 };
@@ -36,16 +36,11 @@ const ENV_CONFIGS = {
  */
 async function getConfig() {
     try {
-        // Try to get user-configured values
         const result = await chrome.storage.sync.get(['apiBaseUrl', 'frontendUrl', 'environment']);
         
-        // Determine environment
         const environment = result.environment || 'development';
-        
-        // Get environment defaults
         const envDefaults = ENV_CONFIGS[environment] || ENV_CONFIGS.development;
         
-        // Merge with user overrides
         return {
             API_BASE_URL: result.apiBaseUrl || envDefaults.API_BASE_URL,
             FRONTEND_URL: result.frontendUrl || envDefaults.FRONTEND_URL,
@@ -53,7 +48,6 @@ async function getConfig() {
         };
     } catch (error) {
         console.error('[CV-Wiz Config] Error loading config:', error);
-        // Fallback to defaults
         return {
             ...DEFAULT_CONFIG,
             environment: 'development',
@@ -143,7 +137,6 @@ function isValidUrl(url) {
     }
 }
 
-// Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         getConfig,

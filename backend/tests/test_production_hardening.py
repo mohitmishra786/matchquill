@@ -33,7 +33,7 @@ class TestCORSRejectsWildcard:
 
     def test_disallowed_origin_does_not_get_star_header(self, client: TestClient):
         response = client.get(
-            "/",
+            "/api/py/",
             headers={"Origin": "https://evil.example.com"},
         )
         assert response.status_code == 200
@@ -45,7 +45,7 @@ class TestCORSRejectsWildcard:
 
     def test_allowed_origin_is_exact_not_wildcard(self, client: TestClient):
         response = client.get(
-            "/",
+            "/api/py/",
             headers={"Origin": "http://localhost:3000"},
         )
         assert response.status_code == 200

@@ -10,7 +10,7 @@ class TestJobDescriptionValidation:
 
     def test_compile_rejects_short_description(self, client: TestClient):
         """Test that compile endpoint rejects short job descriptions."""
-        response = client.post("/compile", json={
+        response = client.post("/api/py/compile", json={
             "authToken": "test_token",
             "jobDescription": "Too short",
         })
@@ -28,7 +28,7 @@ class TestJobDescriptionValidation:
 
     def test_compile_rejects_long_description(self, client: TestClient):
         """Test that compile endpoint rejects very long job descriptions."""
-        response = client.post("/compile", json={
+        response = client.post("/api/py/compile", json={
             "authToken": "test_token",
             "jobDescription": "A" * 50001,
         })
@@ -47,7 +47,7 @@ class TestJobDescriptionValidation:
     def test_compile_accepts_valid_description(self, client: TestClient):
         """Test that compile endpoint accepts valid length descriptions."""
         # Valid length but will fail auth
-        response = client.post("/compile", json={
+        response = client.post("/api/py/compile", json={
             "authToken": "invalid_token",
             "jobDescription": "This is a valid job description with sufficient length. " * 5,
         })
@@ -57,7 +57,7 @@ class TestJobDescriptionValidation:
 
     def test_cover_letter_rejects_short_description(self, client: TestClient):
         """Test that cover letter endpoint rejects short job descriptions."""
-        response = client.post("/cover-letter", json={
+        response = client.post("/api/py/cover-letter", json={
             "authToken": "test_token",
             "jobDescription": "Too short",
         })
@@ -75,7 +75,7 @@ class TestJobDescriptionValidation:
 
     def test_cover_letter_rejects_long_description(self, client: TestClient):
         """Test that cover letter endpoint rejects very long job descriptions."""
-        response = client.post("/cover-letter", json={
+        response = client.post("/api/py/cover-letter", json={
             "authToken": "test_token",
             "jobDescription": "A" * 50001,
         })
@@ -93,7 +93,7 @@ class TestJobDescriptionValidation:
 
     def test_compile_pdf_rejects_short_description(self, client: TestClient):
         """Test that compile PDF endpoint rejects short job descriptions."""
-        response = client.post("/compile/pdf", json={
+        response = client.post("/api/py/compile/pdf", json={
             "authToken": "test_token",
             "jobDescription": "Too short",
         })
@@ -111,7 +111,7 @@ class TestJobDescriptionValidation:
 
     def test_preview_rejects_short_description(self, client: TestClient):
         """Test that preview endpoint rejects short job descriptions."""
-        response = client.post("/cover-letter/preview", json={
+        response = client.post("/api/py/cover-letter/preview", json={
             "authToken": "test_token",
             "jobDescription": "Too short",
         })
@@ -130,14 +130,14 @@ class TestJobDescriptionValidation:
     def test_exact_boundary_values(self, client: TestClient):
         """Test boundary values for job description length."""
         # Exactly 50 characters - should pass validation (fail auth)
-        response = client.post("/compile", json={
+        response = client.post("/api/py/compile", json={
             "authToken": "invalid",
             "jobDescription": "A" * 50,
         })
         assert response.status_code == 401  # Passes validation, fails auth
         
         # Exactly 50000 characters - should pass validation (fail auth)
-        response = client.post("/compile", json={
+        response = client.post("/api/py/compile", json={
             "authToken": "invalid",
             "jobDescription": "A" * 50000,
         })
@@ -152,7 +152,7 @@ class TestCoverLetterToneValidation:
         valid_tones = ["professional", "enthusiastic", "formal"]
         
         for tone in valid_tones:
-            response = client.post("/cover-letter", json={
+            response = client.post("/api/py/cover-letter", json={
                 "authToken": "invalid_token",
                 "jobDescription": "This is a valid job description with sufficient length. " * 5,
                 "tone": tone,
@@ -163,7 +163,7 @@ class TestCoverLetterToneValidation:
 
     def test_invalid_tone_rejected(self, client: TestClient):
         """Test that invalid tone values are rejected."""
-        response = client.post("/cover-letter", json={
+        response = client.post("/api/py/cover-letter", json={
             "authToken": "test_token",
             "jobDescription": "This is a valid job description with sufficient length. " * 5,
             "tone": "invalid_tone",
@@ -178,7 +178,7 @@ class TestCoverLetterToneValidation:
 
     def test_default_tone_used(self, client: TestClient):
         """Test that default tone is used when not specified."""
-        response = client.post("/cover-letter", json={
+        response = client.post("/api/py/cover-letter", json={
             "authToken": "invalid_token",
             "jobDescription": "This is a valid job description with sufficient length. " * 5,
             # No tone specified

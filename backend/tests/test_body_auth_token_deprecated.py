@@ -162,7 +162,7 @@ class TestOptionalBodyAuthToken:
 
     def test_compile_header_only_auth(self, client):
         response = client.post(
-            "/compile",
+            "/api/py/compile",
             json={"jobDescription": "A" * 60},
             headers={"Authorization": "Bearer header-only-token"},
         )
@@ -171,7 +171,7 @@ class TestOptionalBodyAuthToken:
 
     def test_cover_letter_header_only_auth(self, client):
         response = client.post(
-            "/cover-letter",
+            "/api/py/cover-letter",
             json={"jobDescription": "A" * 60, "tone": "professional"},
             headers={"Authorization": "Bearer header-only-token"},
         )
@@ -181,7 +181,7 @@ class TestOptionalBodyAuthToken:
     def test_compile_body_token_still_works(self, client, caplog):
         with caplog.at_level(logging.WARNING, logger="cv-wiz"):
             response = client.post(
-                "/compile",
+                "/api/py/compile",
                 json={"authToken": "legacy-body-token", "jobDescription": "A" * 60},
             )
         assert response.status_code == 200
