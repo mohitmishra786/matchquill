@@ -1,7 +1,7 @@
 # MatchQuill Codebase Knowledge Document
 
 > **Last Updated**: 2026-01-31  
-> **Repository**: `/Users/chessman/Desktop/Projects/Github/cv-wiz` (directory name pending rename — see Human Actions Required)  
+> **Repository**: `matchquill` (github.com/mohitmishra786/matchquill)  
 > **Purpose**: Complete knowledge base for implementing features, fixing bugs, and refactoring safely
 
 ---
@@ -441,7 +441,7 @@ MatchQuill is a **career resume compiler** that uses AI to generate tailored res
 ### 4.1 Project Structure
 
 ```
-cv-wiz/  (directory name pending rename — see Human Actions Required)
+matchquill/
 ├── backend/                    # FastAPI application
 │   ├── app/
 │   │   ├── main.py            # Entry point

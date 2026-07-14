@@ -25,7 +25,7 @@ Do not announce, register handles under, or spend on brand assets for this name 
 - [ ] Register `@matchquill` on X/Twitter, LinkedIn, Instagram, YouTube; claim `matchquill` GitHub org + npm name.
 - [ ] Point matchquill.com at the app; verify SSL, OAuth callback URLs, and email domain (SPF/DKIM).
 - [ ] Publish the Chrome extension to the Chrome Web Store (confirm no existing "MatchQuill" listing first) with screenshots + privacy policy describing local JD extraction.
-- [ ] Swap in the proposed README (`docs/launch-content/README-proposed.md`) after review.
+- [x] Swap in the polished README (now live as the repo root `README.md`).
 - [ ] Prepare demo GIF/video: extension extracting a real JD → tailored resume PDF in one click.
 - [ ] Final copy review: no "AI resume builder" hero; semantic layer described as **optional / off by default / unverified** everywhere.
 - [ ] Legal/honesty pass: no unsourced stats; "zero hallucination" framed as a design constraint.
