@@ -18,7 +18,6 @@ from datetime import datetime
 
 import pytest
 
-import app.utils.relevance_scorer as relevance_scorer_module
 from app.config import Settings
 from app.models.user import Experience, Skill
 from app.utils.embedding_service import EmbeddingService, cosine_similarity
@@ -28,7 +27,9 @@ from app.utils.relevance_scorer import RelevanceScorer
 def _enable_semantic_matching(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the `semantic_matching` feature flag on for a single test."""
     settings = Settings(feature_flags="semantic_matching")
-    monkeypatch.setattr(relevance_scorer_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.utils.relevance_scorer.get_settings", lambda: settings
+    )
 
 
 @pytest.fixture(autouse=True)

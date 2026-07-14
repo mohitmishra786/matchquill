@@ -94,7 +94,7 @@ class RelevanceScorer:
         
         # Create a cache key from the job description
         import hashlib
-        cache_key = hashlib.md5(job_description.lower().encode()).hexdigest()
+        cache_key = hashlib.md5(job_description.lower().encode(), usedforsecurity=False).hexdigest()
         
         # Return cached instance if available
         if cache_key in cls._cache:
@@ -174,7 +174,7 @@ class RelevanceScorer:
             return None
 
         import hashlib
-        cache_key = hashlib.md5(text.strip().lower().encode()).hexdigest()
+        cache_key = hashlib.md5(text.strip().lower().encode(), usedforsecurity=False).hexdigest()
 
         if cache_key in cls._embedding_cache:
             return cls._embedding_cache[cache_key]
