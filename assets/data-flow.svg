@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="280" viewBox="0 0 1000 280" font-family="Helvetica Neue, Arial, sans-serif">
+  <defs>
+    <linearGradient id="flowBrand" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#9333ea"/>
+    </linearGradient>
+    <marker id="flowArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#a78bfa"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="30" font-size="12.5" fill="#64748b">MatchQuill &#8212; from &#8220;job found&#8221; to ATS-ready PDF</text>
+
+  <!-- connecting track -->
+  <line x1="120" y1="140" x2="900" y2="140" stroke="#a78bfa" stroke-width="2" stroke-dasharray="4 5"/>
+
+  <!-- Step 1: Job found -->
+  <circle cx="120" cy="140" r="42" fill="url(#flowBrand)"/>
+  <text x="120" y="146" font-size="26" text-anchor="middle" fill="#ffffff">1</text>
+  <text x="120" y="205" font-size="13" font-weight="700" text-anchor="middle" fill="#818cf8">Job found</text>
+  <text x="120" y="223" font-size="11" text-anchor="middle" fill="#94a3b8">a posting in</text>
+  <text x="120" y="237" font-size="11" text-anchor="middle" fill="#94a3b8">your browser</text>
+
+  <!-- Step 2: Extract JD -->
+  <circle cx="315" cy="140" r="42" fill="url(#flowBrand)"/>
+  <text x="315" y="146" font-size="26" text-anchor="middle" fill="#ffffff">2</text>
+  <text x="315" y="205" font-size="13" font-weight="700" text-anchor="middle" fill="#818cf8">Extract JD</text>
+  <text x="315" y="223" font-size="11" text-anchor="middle" fill="#94a3b8">extension parses</text>
+  <text x="315" y="237" font-size="11" text-anchor="middle" fill="#94a3b8">the page locally</text>
+
+  <!-- Step 3: Score -->
+  <circle cx="510" cy="140" r="42" fill="url(#flowBrand)"/>
+  <text x="510" y="146" font-size="26" text-anchor="middle" fill="#ffffff">3</text>
+  <text x="510" y="205" font-size="13" font-weight="700" text-anchor="middle" fill="#818cf8">Score</text>
+  <text x="510" y="223" font-size="11" text-anchor="middle" fill="#94a3b8">backend ranks profile</text>
+  <text x="510" y="237" font-size="11" text-anchor="middle" fill="#94a3b8">against the posting</text>
+
+  <!-- Step 4: Tailor -->
+  <circle cx="705" cy="140" r="42" fill="url(#flowBrand)"/>
+  <text x="705" y="146" font-size="26" text-anchor="middle" fill="#ffffff">4</text>
+  <text x="705" y="205" font-size="13" font-weight="700" text-anchor="middle" fill="#818cf8">Tailor</text>
+  <text x="705" y="223" font-size="11" text-anchor="middle" fill="#94a3b8">Groq generates</text>
+  <text x="705" y="237" font-size="11" text-anchor="middle" fill="#94a3b8">zero-hallucination</text>
+
+  <!-- Step 5: PDF out -->
+  <circle cx="900" cy="140" r="42" fill="url(#flowBrand)"/>
+  <text x="900" y="146" font-size="26" text-anchor="middle" fill="#ffffff">5</text>
+  <text x="900" y="205" font-size="13" font-weight="700" text-anchor="middle" fill="#818cf8">PDF out</text>
+  <text x="900" y="223" font-size="11" text-anchor="middle" fill="#94a3b8">ATS-ready resume</text>
+  <text x="900" y="237" font-size="11" text-anchor="middle" fill="#94a3b8">+ cover letter</text>
+
+  <!-- arrowheads along track -->
+  <line x1="200" y1="140" x2="234" y2="140" stroke="#a78bfa" stroke-width="2" marker-end="url(#flowArrow)"/>
+  <line x1="395" y1="140" x2="429" y2="140" stroke="#a78bfa" stroke-width="2" marker-end="url(#flowArrow)"/>
+  <line x1="590" y1="140" x2="624" y2="140" stroke="#a78bfa" stroke-width="2" marker-end="url(#flowArrow)"/>
+  <line x1="785" y1="140" x2="819" y2="140" stroke="#a78bfa" stroke-width="2" marker-end="url(#flowArrow)"/>
+</svg>
