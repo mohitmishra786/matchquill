@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import heapq
 from typing import TypeVar, Generic, Optional, Callable, List, Any
 
+from app.config import get_settings
 from app.models.user import (
     UserProfile,
     Experience,
@@ -17,6 +18,10 @@ from app.models.user import (
     Skill,
     Publication,
 )
+# Importing this module is always safe/cheap: the heavy sentence-transformer
+# dependency is only imported lazily, inside EmbeddingService, on first use
+# (and only if the `semantic_matching` feature flag is enabled).
+from app.utils.embedding_service import EmbeddingService, cosine_similarity
 
 
 T = TypeVar("T", Experience, Project, Education, Skill, Publication)
@@ -28,6 +33,10 @@ class ScoredItem(Generic[T]):
     item: T
     score: float
     matched_keywords: list[str]
+    # Semantic (embedding) similarity contribution, 0.0 when the semantic
+    # backend is disabled/unavailable. Exposed for transparency/debugging;
+    # `score` already includes this as an additive term.
+    semantic_similarity: float = 0.0
 
 
 class RelevanceScorer:
@@ -56,10 +65,24 @@ class RelevanceScorer:
     RECENCY_BOOST = 1.2  # Boost for items in last 2 years
     TITLE_MATCH_BOOST = 2.0  # Boost when job title matches
     SKILL_EXACT_MATCH_BOOST = 1.5  # Boost for exact skill matches
-    
+
+    # Max additive bonus contributed by embedding-based semantic similarity
+    # (cosine similarity in [0, 1] times this weight). Additive, applied after
+    # keyword-density normalization, so it rewards paraphrased/semantically
+    # equivalent content that the keyword pass alone would score near zero --
+    # without ever letting semantics override a strong keyword match.
+    SEMANTIC_SIMILARITY_WEIGHT = 6.0
+
     # Class-level cache for processed job descriptions
     _cache: dict = {}
     _cache_max_size: int = 100  # Maximum cached job descriptions
+
+    # Class-level cache for computed text embeddings (JD + profile item text
+    # blobs), MD5-keyed and LRU(FIFO)-bounded exactly like `_cache` above.
+    # Shared across all RelevanceScorer instances/JDs so a profile item's
+    # embedding is computed once no matter how many JDs it gets scored against.
+    _embedding_cache: dict = {}
+    _embedding_cache_max_size: int = 2000
     
     def __new__(cls, job_description: str):
         """
@@ -105,20 +128,31 @@ class RelevanceScorer:
         self.job_description = job_description.lower()
         self.jd_tokens = self._tokenize(job_description)
         self.jd_keyword_freq = Counter(self.jd_tokens)
-        
+
         # Extract potential job title and company (heuristic)
         self.job_title = self._extract_job_title(job_description)
         self.required_skills = self._extract_required_skills(job_description)
-        
+
+        # Semantic matching is opt-in via the FEATURE_FLAGS env var
+        # (`semantic_matching`) so that the default keyword-only behavior --
+        # and the existing test suite -- are completely unaffected unless an
+        # operator explicitly turns it on. When enabled, the JD embedding is
+        # computed once (cached) and reused for every item scored against it.
+        settings = get_settings()
+        self.semantic_enabled = settings.is_feature_enabled("semantic_matching")
+        self.jd_embedding = (
+            self._get_cached_embedding(job_description) if self.semantic_enabled else None
+        )
+
         self._initialized = True
-    
+
     @classmethod
     def clear_cache(cls) -> int:
         """Clear the job description cache. Returns number of entries cleared."""
         count = len(cls._cache)
         cls._cache.clear()
         return count
-    
+
     @classmethod
     def get_cache_stats(cls) -> dict:
         """Get cache statistics."""
@@ -127,7 +161,58 @@ class RelevanceScorer:
             "max_size": cls._cache_max_size,
             "cache_keys": list(cls._cache.keys()),
         }
-    
+
+    @classmethod
+    def _get_cached_embedding(cls, text: str) -> Optional[list]:
+        """
+        Return a cached embedding for `text`, computing and caching it on
+        miss. MD5-keyed and FIFO-bounded, mirroring the `_cache` pattern used
+        for job description instances above. Returns None (no crash) if the
+        embedding backend is unavailable.
+        """
+        if not text or not text.strip():
+            return None
+
+        import hashlib
+        cache_key = hashlib.md5(text.strip().lower().encode()).hexdigest()
+
+        if cache_key in cls._embedding_cache:
+            return cls._embedding_cache[cache_key]
+
+        vector = EmbeddingService.embed(text)
+        if vector is None:
+            return None
+
+        if len(cls._embedding_cache) >= cls._embedding_cache_max_size:
+            oldest_key = next(iter(cls._embedding_cache))
+            del cls._embedding_cache[oldest_key]
+
+        cls._embedding_cache[cache_key] = vector
+        return vector
+
+    @classmethod
+    def clear_embedding_cache(cls) -> int:
+        """Clear the embedding cache. Returns number of entries cleared."""
+        count = len(cls._embedding_cache)
+        cls._embedding_cache.clear()
+        return count
+
+    def _semantic_similarity(self, text_blob: str) -> float:
+        """
+        Raw cosine similarity in [0, 1] between `text_blob` and this scorer's
+        job description embedding. Returns 0.0 (never raises) when semantic
+        matching is disabled, the embedding backend is unavailable, or either
+        text fails to embed -- the keyword score is always usable on its own.
+        """
+        if not self.semantic_enabled or self.jd_embedding is None:
+            return 0.0
+
+        item_embedding = self._get_cached_embedding(text_blob)
+        if item_embedding is None:
+            return 0.0
+
+        return cosine_similarity(self.jd_embedding, item_embedding)
+
     def _tokenize(self, text: str) -> list[str]:
         """
         Tokenize text into meaningful keywords.
@@ -226,11 +311,20 @@ class RelevanceScorer:
         # Normalize by number of keywords to avoid favoring longer descriptions
         if len(exp_tokens) > 0:
             score = score / (len(exp_tokens) ** 0.5)  # Square root normalization
-        
+
+        # Semantic similarity bonus: catches paraphrased/semantically-equivalent
+        # experience (e.g. "led cross-functional teams" vs a JD asking for
+        # "project management") that shares no keywords with the JD. No-op
+        # unless the `semantic_matching` feature flag is enabled.
+        semantic_similarity = self._semantic_similarity(text_blob)
+        score += semantic_similarity * self.SEMANTIC_SIMILARITY_WEIGHT
+
         # Store score in the item
         exp.relevance_score = score
-        
-        return ScoredItem(item=exp, score=score, matched_keywords=matched)
+
+        return ScoredItem(
+            item=exp, score=score, matched_keywords=matched, semantic_similarity=semantic_similarity
+        )
     
     def score_project(self, proj: Project) -> ScoredItem[Project]:
         """Score a project entry."""
@@ -258,9 +352,14 @@ class RelevanceScorer:
         
         if len(proj_tokens) > 0:
             score = score / (len(proj_tokens) ** 0.5)
-        
+
+        semantic_similarity = self._semantic_similarity(text_blob)
+        score += semantic_similarity * self.SEMANTIC_SIMILARITY_WEIGHT
+
         proj.relevance_score = score
-        return ScoredItem(item=proj, score=score, matched_keywords=matched)
+        return ScoredItem(
+            item=proj, score=score, matched_keywords=matched, semantic_similarity=semantic_similarity
+        )
     
     def score_skill(self, skill: Skill) -> ScoredItem[Skill]:
         """Score a skill entry."""
@@ -285,9 +384,17 @@ class RelevanceScorer:
         # Boost by proficiency
         if skill.proficiency and skill.proficiency.lower() == "expert":
             score *= 1.2
-        
+
+        # Semantic bonus catches skills phrased differently than the JD's
+        # wording (e.g. skill "Stakeholder Management" vs JD phrase
+        # "coordinate priorities across teams").
+        semantic_similarity = self._semantic_similarity(skill_name_lower)
+        score += semantic_similarity * self.SEMANTIC_SIMILARITY_WEIGHT
+
         skill.relevance_score = score
-        return ScoredItem(item=skill, score=score, matched_keywords=matched)
+        return ScoredItem(
+            item=skill, score=score, matched_keywords=matched, semantic_similarity=semantic_similarity
+        )
     
     def score_education(self, edu: Education) -> ScoredItem[Education]:
         """Score an education entry."""
@@ -308,8 +415,13 @@ class RelevanceScorer:
                 score += self.jd_keyword_freq[token]
                 matched.append(token)
         
+        semantic_similarity = self._semantic_similarity(text_blob)
+        score += semantic_similarity * self.SEMANTIC_SIMILARITY_WEIGHT
+
         edu.relevance_score = score
-        return ScoredItem(item=edu, score=score, matched_keywords=matched)
+        return ScoredItem(
+            item=edu, score=score, matched_keywords=matched, semantic_similarity=semantic_similarity
+        )
     
     def score_publication(self, pub: Publication) -> ScoredItem[Publication]:
         """Score a publication entry."""
@@ -329,8 +441,13 @@ class RelevanceScorer:
                 score += self.jd_keyword_freq[token]
                 matched.append(token)
         
+        semantic_similarity = self._semantic_similarity(text_blob)
+        score += semantic_similarity * self.SEMANTIC_SIMILARITY_WEIGHT
+
         pub.relevance_score = score
-        return ScoredItem(item=pub, score=score, matched_keywords=matched)
+        return ScoredItem(
+            item=pub, score=score, matched_keywords=matched, semantic_similarity=semantic_similarity
+        )
     
     def _top_scored(
         self,

@@ -141,6 +141,24 @@ TF-IDF-inspired algorithm with boosts:
 - **Title match boost (2.0x)**: Exact job title matches
 - **Keyword density**: More matching keywords = higher score
 
+**Optional semantic layer:** `RelevanceScorer` can additionally blend in
+embedding-based (sentence-transformer) cosine similarity, which catches
+paraphrased/semantically-equivalent phrasing that shares no keywords with the
+job description (e.g. "led cross-functional teams" vs. a JD asking for
+"project management experience"). This is gated behind the
+`semantic_matching` feature flag (`FEATURE_FLAGS=semantic_matching`, see
+`app/config.py`) and is **off by default** — the keyword/TF-IDF score above is
+always computed and always usable on its own. When enabled, semantic
+similarity is added as a bounded bonus on top of the keyword score (never a
+replacement); embeddings are cached (MD5-keyed, size-bounded, in-process) so
+each JD/profile-item text is embedded at most once. The backend
+(`sentence-transformers/all-MiniLM-L6-v2`, an optional dependency — see
+`backend/requirements-semantic.txt`) degrades to a no-op if the dependency
+isn't installed or fails to load, so keyword scoring is never at risk. This
+does not change any API response shape: callers still consume
+`RelevanceScorer.select_top_items()`, which returns the same profile item
+models as before.
+
 ### 3. Template System
 
 Templates define section priority and limits:
