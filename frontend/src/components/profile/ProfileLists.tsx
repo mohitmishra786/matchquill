@@ -110,15 +110,24 @@ const ExperienceCard = memo(function ExperienceCard({
     const logger = createLogger({ component: 'ExperienceCard' });
     const { id } = exp;
 
+    // `exp` carries display-only formattedStartDate/formattedEndDate fields
+    // added by the memoized formatting step in ExperienceList - strip them
+    // before handing the record back to the caller so onEdit only ever
+    // receives a plain Experience.
+    const originalExp = useMemo(() => {
+        const { formattedStartDate: _formattedStartDate, formattedEndDate: _formattedEndDate, ...rest } = exp;
+        return rest as Experience;
+    }, [exp]);
+
     const handleClick = useCallback(() => {
         logger.debug('[ExperienceList] Edit experience clicked', { id });
-        onEdit(exp);
-    }, [id, exp, onEdit, logger]);
+        onEdit(originalExp);
+    }, [id, originalExp, onEdit, logger]);
 
     const handleEditClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        onEdit(exp);
-    }, [exp, onEdit]);
+        onEdit(originalExp);
+    }, [originalExp, onEdit]);
 
     return (
         <div

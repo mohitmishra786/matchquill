@@ -29,11 +29,13 @@ describe('KeyboardShortcutsHelp', () => {
 
     it('should display all shortcut categories', () => {
         render(<KeyboardShortcutsHelp isOpen={true} onClose={mockOnClose} />);
-        
-        expect(screen.getByText('Global')).toBeInTheDocument();
-        expect(screen.getByText('Navigation')).toBeInTheDocument();
-        expect(screen.getByText('Actions')).toBeInTheDocument();
-        expect(screen.getByText('Forms')).toBeInTheDocument();
+
+        // Each category name appears twice (a filter chip button and a
+        // section heading), so scope to the headings to avoid ambiguity.
+        expect(screen.getByRole('heading', { name: 'Global' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Navigation' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Actions' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Forms' })).toBeInTheDocument();
     });
 
     it('should filter shortcuts by search query', () => {
@@ -47,29 +49,31 @@ describe('KeyboardShortcutsHelp', () => {
 
     it('should filter shortcuts by category', () => {
         render(<KeyboardShortcutsHelp isOpen={true} onClose={mockOnClose} />);
-        
-        const globalButton = screen.getByText('Global');
+
+        // "Global" matches both the filter chip button and a section
+        // heading - target the button explicitly.
+        const globalButton = screen.getByRole('button', { name: 'Global' });
         fireEvent.click(globalButton);
-        
+
         // Should show Global shortcuts
         expect(screen.getByText('Show/hide keyboard shortcuts help')).toBeInTheDocument();
     });
 
     it('should show "All" button for clearing category filter', () => {
         render(<KeyboardShortcutsHelp isOpen={true} onClose={mockOnClose} />);
-        
+
         const allButton = screen.getByText('All');
         expect(allButton).toBeInTheDocument();
-        
+
         // Click a category first
-        fireEvent.click(screen.getByText('Global'));
-        
+        fireEvent.click(screen.getByRole('button', { name: 'Global' }));
+
         // Then click All to clear filter
         fireEvent.click(allButton);
-        
+
         // All categories should be visible again
-        expect(screen.getByText('Navigation')).toBeInTheDocument();
-        expect(screen.getByText('Actions')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Navigation' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Actions' })).toBeInTheDocument();
     });
 
     it('should show empty state when no shortcuts match', () => {
@@ -83,17 +87,31 @@ describe('KeyboardShortcutsHelp', () => {
 
     it('should display shortcut keys in kbd elements', () => {
         render(<KeyboardShortcutsHelp isOpen={true} onClose={mockOnClose} />);
-        
-        // Check for some specific shortcuts
-        expect(screen.getByText('?')).toBeInTheDocument();
+
+        // "?" appears in both the shortcuts list and the footer help text.
+        expect(screen.getAllByText('?').length).toBeGreaterThan(0);
         expect(screen.getByText('Esc')).toBeInTheDocument();
     });
 
     it('should show help text in footer', () => {
         render(<KeyboardShortcutsHelp isOpen={true} onClose={mockOnClose} />);
-        
+
         expect(screen.getByText(/Press/)).toBeInTheDocument();
-        expect(screen.getByText('anytime to show this help')).toBeInTheDocument();
+        // The footer text is split across text nodes by the <kbd> element
+        // ("Press <kbd>?</kbd> anytime to show this help"), so no single
+        // node's own text matches "anytime to show this help" exactly -
+        // match on the full normalized text of the containing element
+        // instead, restricted to the element whose *direct* children don't
+        // already contain the full phrase (to avoid matching every ancestor).
+        expect(screen.getByText((_, element) => {
+            if (!element) return false;
+            const normalize = (text: string | null) => (text ?? '').replace(/\s+/g, ' ').trim();
+            const hasFullText = normalize(element.textContent) === 'Press ? anytime to show this help';
+            const childHasFullText = Array.from(element.children).some(
+                child => normalize(child.textContent) === 'Press ? anytime to show this help'
+            );
+            return hasFullText && !childHasFullText;
+        })).toBeInTheDocument();
     });
 
     it('should reset search when reopened', () => {

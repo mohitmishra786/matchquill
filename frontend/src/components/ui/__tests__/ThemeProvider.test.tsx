@@ -62,12 +62,17 @@ describe('ThemeProvider', () => {
         expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     });
 
-    it('should use system preference when no stored preference', async () => {
+    it('should default to light mode when no stored preference, ignoring system preference', async () => {
+        // ThemeProvider deliberately defaults to light mode instead of
+        // following the OS/browser dark-mode preference (see
+        // getInitialTheme() in ThemeProvider.tsx) - this was an intentional
+        // product decision, not a bug. matchMedia is still consulted for
+        // *live* preference-change events, but not for the initial theme.
         localStorageMock.getItem.mockReturnValue(null);
-        matchMediaMock.mockReturnValue({ 
-            matches: true, 
-            addEventListener: vi.fn(), 
-            removeEventListener: vi.fn() 
+        matchMediaMock.mockReturnValue({
+            matches: true,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn()
         });
 
         render(
@@ -77,9 +82,9 @@ describe('ThemeProvider', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByTestId('theme-value').textContent).toBe('dark');
+            expect(screen.getByTestId('theme-value').textContent).toBe('light');
         });
-        expect(localStorageMock.setItem).toHaveBeenCalledWith('matchquill-theme', 'dark');
+        expect(localStorageMock.setItem).toHaveBeenCalledWith('matchquill-theme', 'light');
     });
 
     it('should toggle theme', async () => {

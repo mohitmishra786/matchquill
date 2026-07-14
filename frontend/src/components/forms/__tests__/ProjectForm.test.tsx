@@ -117,10 +117,12 @@ describe('ProjectForm', () => {
         fireEvent.click(screen.getByText('Save Project'));
 
         await waitFor(() => {
+            // sanitizeUrl() (src/lib/sanitization.ts) normalizes an empty/absent
+            // URL to `null` (its return type is `string | null`), not `undefined`.
             expect(mockOnSubmit).toHaveBeenCalledWith({
                 name: 'My Project',
                 description: 'Project Description',
-                url: undefined,
+                url: null,
                 startDate: undefined,
                 endDate: undefined,
                 technologies: ['React', 'TypeScript', 'Node.js'],

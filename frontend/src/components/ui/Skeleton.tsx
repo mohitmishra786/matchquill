@@ -85,6 +85,7 @@ export default function Skeleton({
                 className
             )}
             style={customStyles}
+            role="presentation"
             aria-hidden="true"
             {...props}
         />

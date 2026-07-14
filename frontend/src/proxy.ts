@@ -22,6 +22,8 @@ export function isValidSessionToken(token: string | undefined): boolean {
         /on\w+=/i,
         /DROP\s+TABLE/i,
         /UNION\s+SELECT/i,
+        /\.\.[/\\]/, // path traversal (../, ..\)
+        /^[/\\]/, // absolute path
     ];
 
     return !suspiciousPatterns.some(pattern => pattern.test(token));

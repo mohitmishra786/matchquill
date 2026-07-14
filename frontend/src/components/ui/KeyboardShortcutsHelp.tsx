@@ -70,14 +70,16 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
         return acc;
     }, {} as Record<string, Shortcut[]>);
 
-    // Reset search when modal opens
+    // Reset search when modal opens.
+    // This runs in a useEffect (after render/commit), so calling setState
+    // directly here does not trigger a synchronous render-phase update -
+    // no requestAnimationFrame indirection is needed, and deferring via RAF
+    // only delayed the reset by a frame (visible as a brief flash of the
+    // previous search value when reopening the modal).
     useEffect(() => {
         if (isOpen) {
-            // Using requestAnimationFrame to avoid setState during render
-            requestAnimationFrame(() => {
-                setSearchQuery('');
-                setSelectedCategory(null);
-            });
+            setSearchQuery('');
+            setSelectedCategory(null);
         }
     }, [isOpen]);
 

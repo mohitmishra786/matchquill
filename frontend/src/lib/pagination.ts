@@ -42,10 +42,13 @@ export const MAX_LIMIT = 100;
  * @returns Parsed and validated pagination parameters
  */
 export function parsePaginationParams(searchParams: URLSearchParams): PaginationParams {
-    const page = Math.max(1, parseInt(searchParams.get('page') || String(DEFAULT_PAGE), 10));
+    const parsedPage = parseInt(searchParams.get('page') || String(DEFAULT_PAGE), 10);
+    const page = Math.max(1, Number.isNaN(parsedPage) ? DEFAULT_PAGE : parsedPage);
+
+    const parsedLimit = parseInt(searchParams.get('limit') || String(DEFAULT_LIMIT), 10);
     const limit = Math.min(
         MAX_LIMIT,
-        Math.max(1, parseInt(searchParams.get('limit') || String(DEFAULT_LIMIT), 10))
+        Math.max(1, Number.isNaN(parsedLimit) ? DEFAULT_LIMIT : parsedLimit)
     );
     const sortBy = searchParams.get('sortBy') || undefined;
     const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';

@@ -122,9 +122,13 @@ describe('SkeletonAvatar', () => {
     });
 
     it('renders with different sizes', () => {
+        // SkeletonAvatar renders multiple role="presentation" placeholders
+        // (the avatar circle plus text lines) - the avatar circle is
+        // always the first one rendered.
         const { rerender } = render(<SkeletonAvatar size="sm" />);
         rerender(<SkeletonAvatar size="lg" />);
-        expect(screen.getByRole('presentation', { hidden: true })).toBeInTheDocument();
+        const [avatar] = screen.getAllByRole('presentation', { hidden: true });
+        expect(avatar).toHaveClass('w-24', 'h-24');
     });
 });
 

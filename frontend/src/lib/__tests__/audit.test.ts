@@ -22,11 +22,14 @@ import {
     archiveOldAuditLogs,
 } from '../audit';
 import prisma from '../prisma';
+import { logger } from '../logger';
 import type { NextRequest } from 'next/server';
 
 // Mock prisma
-vi.mock('../prisma', () => ({
-    default: {
+// audit.ts imports the named `prisma` export (not default), so the mock
+// must provide both to match the real module shape.
+vi.mock('../prisma', () => {
+    const mockPrisma = {
         auditLog: {
             create: vi.fn(),
             findMany: vi.fn(),
@@ -34,8 +37,12 @@ vi.mock('../prisma', () => ({
             deleteMany: vi.fn(),
             groupBy: vi.fn(),
         },
-    },
-}));
+    };
+    return {
+        prisma: mockPrisma,
+        default: mockPrisma,
+    };
+});
 
 describe('createAuditLog', () => {
     beforeEach(() => {
@@ -100,15 +107,22 @@ describe('createAuditLog', () => {
 
     it('should not throw on database error', async () => {
         (prisma.auditLog.create as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('DB error'));
-        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        // createAuditLog now reports failures through the structured `logger`
+        // (see src/lib/logger.ts) rather than raw console.error.
+        const loggerSpy = vi.spyOn(logger, 'warn').mockImplementation(() => { });
 
-        await createAuditLog({
-            action: 'CREATE',
-            entityType: 'User',
-        });
+        await expect(
+            createAuditLog({
+                action: 'CREATE',
+                entityType: 'User',
+            })
+        ).resolves.not.toThrow();
 
-        expect(consoleSpy).toHaveBeenCalledWith('Failed to create audit log:', expect.any(Error));
-        consoleSpy.mockRestore();
+        expect(loggerSpy).toHaveBeenCalledWith(
+            '[Audit] Failed to create audit log',
+            expect.objectContaining({ error: expect.any(Error) })
+        );
+        loggerSpy.mockRestore();
     });
 });
 

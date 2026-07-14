@@ -115,15 +115,23 @@ describe('ErrorBoundary', () => {
 
         expect(screen.getByText('Something went wrong')).toBeInTheDocument();
 
-        // Click try again
-        fireEvent.click(screen.getByRole('button', { name: /Try Again/i }));
-
-        // Re-render with no error
+        // Fix the underlying issue first (e.g. the parent re-renders with
+        // corrected props). The boundary is still showing the fallback UI
+        // here because getDerivedStateFromError only clears on a reset, not
+        // on a prop change.
         rerender(
             <ErrorBoundary componentName="TestComponent">
                 <ThrowAfterRender shouldThrow={false} />
             </ErrorBoundary>
         );
+        expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+
+        // Now click "Try Again" to reset the boundary's error state. Since
+        // the children no longer throw, it renders the recovered content.
+        // (Note: clicking reset before fixing the underlying props would
+        // just re-render the still-throwing child and re-trip the boundary
+        // immediately, since props.children hasn't changed yet.)
+        fireEvent.click(screen.getByRole('button', { name: /Try Again/i }));
 
         expect(screen.getByText('Normal content')).toBeInTheDocument();
     });

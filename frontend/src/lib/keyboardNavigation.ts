@@ -120,9 +120,10 @@ export function focusNext(
     const focusable = getFocusableElements(container);
     if (focusable.length === 0) return null;
 
-    const currentIndex = currentElement
-        ? focusable.indexOf(currentElement)
-        : -1;
+    // Fall back to the currently focused element so callers can invoke
+    // focusNext(container) without tracking the active element themselves.
+    const activeElement = currentElement ?? (document.activeElement as HTMLElement | null);
+    const currentIndex = activeElement ? focusable.indexOf(activeElement) : -1;
 
     let nextIndex = currentIndex + 1;
 
@@ -149,9 +150,13 @@ export function focusPrevious(
     const focusable = getFocusableElements(container);
     if (focusable.length === 0) return null;
 
-    const currentIndex = currentElement
-        ? focusable.indexOf(currentElement)
-        : focusable.length;
+    // Fall back to the currently focused element so callers can invoke
+    // focusPrevious(container) without tracking the active element themselves.
+    // If nothing is focused (or focus is outside the container), default to
+    // "past the end" so the first call moves to the last focusable element.
+    const activeElement = currentElement ?? (document.activeElement as HTMLElement | null);
+    const foundIndex = activeElement ? focusable.indexOf(activeElement) : -1;
+    const currentIndex = foundIndex >= 0 ? foundIndex : focusable.length;
 
     let prevIndex = currentIndex - 1;
 

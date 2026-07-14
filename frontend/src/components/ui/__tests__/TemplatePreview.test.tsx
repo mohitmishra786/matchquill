@@ -36,9 +36,11 @@ describe('TemplatePreview', () => {
             />
         );
 
-        expect(screen.getByText('Professional')).toBeInTheDocument();
+        // "Professional" is rendered twice: as the template title (heading)
+        // and as the category badge.
+        expect(screen.getByRole('heading', { name: 'Professional' })).toBeInTheDocument();
         expect(screen.getByText('Best for experienced professionals')).toBeInTheDocument();
-        expect(screen.getByText('Professional')).toBeInTheDocument(); // Category badge
+        expect(screen.getAllByText('Professional')).toHaveLength(2);
     });
 
     it('should show selection state when selected', () => {
@@ -118,7 +120,7 @@ describe('TemplatePreview', () => {
         );
 
         // Component should render without errors with user data
-        expect(screen.getByText('Professional')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Professional' })).toBeInTheDocument();
     });
 
     it('should use sample data when user data is not provided', () => {
@@ -131,7 +133,7 @@ describe('TemplatePreview', () => {
         );
 
         // Component should render with sample data
-        expect(screen.getByText('Professional')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Professional' })).toBeInTheDocument();
     });
 
     it('should apply correct CSS classes when selected', () => {

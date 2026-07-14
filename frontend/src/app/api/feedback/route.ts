@@ -12,7 +12,7 @@ const MIN_COMMENT_LENGTH = 10;
 const MAX_REQUEST_BODY_SIZE = 1024 * 1024;
 
 function validateFeedbackRequest(body: unknown): { valid: boolean; data: Record<string, unknown> | null; error?: string } {
-    if (!body || typeof body !== 'object') {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
         return { valid: false, data: null, error: 'Invalid request body' };
     }
 
@@ -55,17 +55,23 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: validation.error }, { status: 400 });
         }
 
-        const sanitizedData = sanitizeFeedbackData(validation.data!);
-        const { rating, comment, category } = sanitizedData;
-
-        if (rating === undefined || rating === null) {
+        // Validate the raw rating before it goes through sanitizeFeedbackData:
+        // sanitizeFeedbackData -> sanitizeNumber() defaults a missing rating
+        // to 3 and clamps out-of-range values into [1, 5], so validating
+        // *after* sanitizing would always see an in-range number and never
+        // reject a missing or out-of-range rating.
+        const rawRating = (validation.data as Record<string, unknown>).rating;
+        if (rawRating === undefined || rawRating === null) {
             return NextResponse.json({ error: 'Rating is required' }, { status: 400 });
         }
 
-        const ratingNum = Number(rating);
+        const ratingNum = Number(rawRating);
         if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
             return NextResponse.json({ error: 'Rating must be a number between 1 and 5' }, { status: 400 });
         }
+
+        const sanitizedData = sanitizeFeedbackData(validation.data!);
+        const { comment, category } = sanitizedData;
 
         if (!comment || typeof comment !== 'string') {
             return NextResponse.json({ error: 'Comment is required' }, { status: 400 });

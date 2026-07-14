@@ -83,7 +83,11 @@ jobs:
       run: npm run build
 
     - name: Run Tests
-      run: npm run test
+      # Invoke vitest directly rather than through the "test" npm script so
+      # this step can't be silently neutered again by swapping the script
+      # for a no-op (as happened previously - see frontend/vitest.config.mts
+      # and the "test" script in package.json).
+      run: npx vitest run
 
   extension-test:
     name: Extension (Tests)

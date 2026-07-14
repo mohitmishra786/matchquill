@@ -237,7 +237,10 @@ describe('SkillList', () => {
             />
         );
 
-        expect(screen.getByText('PROGRAMMING')).toBeInTheDocument();
+        // The category heading is visually uppercased via CSS
+        // (`uppercase` class), but the underlying DOM text content is
+        // rendered as-is from the `category` field ("Programming").
+        expect(screen.getByText('Programming')).toBeInTheDocument();
         expect(screen.getByText('JavaScript')).toBeInTheDocument();
         expect(screen.getByText('Python')).toBeInTheDocument();
     });

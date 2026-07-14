@@ -248,7 +248,10 @@ export function useOnboardingTour() {
 export function RestartTourButton({ className = '' }: { className?: string }) {
     const { restartTour, hasCompletedTour } = useOnboardingTour();
 
-    if (hasCompletedTour === null) return null;
+    // `hasCompletedTour` is now resolved synchronously (see
+    // useOnboardingTour above), so it is never `null` - only show the
+    // restart option once the user has actually completed the tour.
+    if (!hasCompletedTour) return null;
 
     return (
         <button

@@ -69,9 +69,18 @@ describe('OnboardingTour', () => {
         localStorageMock.getItem.mockReturnValue(null);
 
         render(<OnboardingTour />);
-        
+
+        // The component chains two effects: a 500ms timer sets `isReady`,
+        // whose state update (flushed by `act`) mounts a second effect that
+        // schedules a further 1000ms timer to actually start the tour.
+        // Advancing 2000ms in one shot races that second timer being
+        // registered, so advance in two steps to let the effect chain settle
+        // between them.
         act(() => {
-            vi.advanceTimersByTime(2000);
+            vi.advanceTimersByTime(500);
+        });
+        act(() => {
+            vi.advanceTimersByTime(1000);
         });
 
         expect(mockDrive).toHaveBeenCalled();
@@ -85,9 +94,12 @@ describe('OnboardingTour', () => {
         }));
 
         render(<OnboardingTour />);
-        
+
         act(() => {
-            vi.advanceTimersByTime(2000);
+            vi.advanceTimersByTime(500);
+        });
+        act(() => {
+            vi.advanceTimersByTime(1000);
         });
 
         expect(mockDrive).toHaveBeenCalled();
@@ -101,9 +113,12 @@ describe('OnboardingTour', () => {
         }));
 
         render(<OnboardingTour forceShow={true} />);
-        
+
         act(() => {
-            vi.advanceTimersByTime(2000);
+            vi.advanceTimersByTime(500);
+        });
+        act(() => {
+            vi.advanceTimersByTime(1000);
         });
 
         expect(mockDrive).toHaveBeenCalled();
@@ -114,9 +129,12 @@ describe('OnboardingTour', () => {
         localStorageMock.getItem.mockReturnValue(null);
 
         render(<OnboardingTour onComplete={onComplete} />);
-        
+
         act(() => {
-            vi.advanceTimersByTime(2000);
+            vi.advanceTimersByTime(500);
+        });
+        act(() => {
+            vi.advanceTimersByTime(1000);
         });
 
         // Simulate tour completion by calling onDestroyed callback
@@ -249,7 +267,11 @@ describe('RestartTourButton', () => {
         vi.clearAllMocks();
     });
 
-    it('should not render when tour status is loading', () => {
+    // `hasCompletedTour` is resolved synchronously from localStorage on
+    // mount (see useOnboardingTour), so there is no "loading" state to
+    // observe here - this verifies the button stays hidden until the tour
+    // has actually been completed.
+    it('should not render when the tour has not been completed', () => {
         localStorageMock.getItem.mockReturnValue(null);
 
         render(<RestartTourButton />);
