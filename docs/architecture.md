@@ -2,6 +2,10 @@
 
 ## System Architecture
 
+<p align="center">
+  <img src="../assets/architecture.svg" width="900" alt="MatchQuill system architecture">
+</p>
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              CLIENT LAYER                                    │
