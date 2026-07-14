@@ -9,19 +9,37 @@ import pytest
 mock_wp = MagicMock()
 mock_wp.HTML = MagicMock()
 mock_wp.CSS = MagicMock()
+_real_weasyprint = sys.modules.get("weasyprint")
 sys.modules["weasyprint"] = mock_wp
 
 mock_wp_fonts = MagicMock()
 mock_wp_fonts.FontConfiguration = MagicMock()
+_real_weasyprint_fonts = sys.modules.get("weasyprint.text.fonts")
 sys.modules["weasyprint.text.fonts"] = mock_wp_fonts
 
-# Also mock jinja2 to avoid template loading issues
+# Also mock jinja2 to avoid template loading issues. `pdf_generator` binds
+# `Environment`/`BaseLoader` from this module at import time below, so it's
+# safe to restore the real `jinja2` in sys.modules immediately afterwards --
+# doing so prevents this file from permanently poisoning `jinja2` for the
+# rest of the test session (other optional deps, e.g. sentence-transformers'
+# transformers backend, import jinja2 lazily and break if it's a bare Mock
+# without a real `__spec__`).
+_real_jinja2 = sys.modules.get("jinja2")
 mock_jinja2 = MagicMock()
 sys.modules["jinja2"] = mock_jinja2
 mock_jinja2.Environment = MagicMock()
 
 from app.utils.pdf_generator import PDFGenerator  # noqa: E402
 from app.models.resume import CompiledResume  # noqa: E402
+
+# Restore the real modules now that PDFGenerator has bound its own references
+# to the mocks above -- keeps this test file's isolation self-contained.
+if _real_weasyprint is not None:
+    sys.modules["weasyprint"] = _real_weasyprint
+if _real_weasyprint_fonts is not None:
+    sys.modules["weasyprint.text.fonts"] = _real_weasyprint_fonts
+if _real_jinja2 is not None:
+    sys.modules["jinja2"] = _real_jinja2
 
 
 @pytest.fixture

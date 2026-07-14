@@ -1,0 +1,23 @@
+# Optional dependencies for embedding-based semantic relevance matching.
+#
+# These are NOT part of the default `requirements.txt` install: torch pulls
+# in several hundred MB, which is unnecessary weight for CI, for cold serverless
+# starts, and for any deployment that only wants keyword/TF-IDF scoring.
+#
+# `app/utils/relevance_scorer.py` and `app/utils/embedding_service.py` guard
+# every import of these packages -- if they are not installed, semantic
+# matching is simply unavailable and the app falls back to keyword-only
+# scoring (no crash either way).
+#
+# Install with:
+#   pip install -r requirements.txt -r requirements-semantic.txt
+#
+# Then enable the feature at runtime with:
+#   FEATURE_FLAGS=semantic_matching
+#
+# (Combine with other flags as a comma-separated list, e.g.
+#  FEATURE_FLAGS=semantic_matching,some_other_flag)
+
+sentence-transformers==5.6.0
+torch==2.13.0
+numpy==2.5.1

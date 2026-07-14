@@ -2,6 +2,7 @@
 
 from app.utils.redis_cache import redis_client, get_cached, set_cached, generate_cache_key
 from app.utils.relevance_scorer import RelevanceScorer
+from app.utils.embedding_service import EmbeddingService
 
 # PDFGenerator requires system dependencies (gobject, pango)
 # Import is optional for development without these deps
@@ -20,6 +21,7 @@ __all__ = [
     "set_cached",
     "generate_cache_key",
     "RelevanceScorer",
+    "EmbeddingService",
     "PDFGenerator",
     "PDF_AVAILABLE",
 ]
