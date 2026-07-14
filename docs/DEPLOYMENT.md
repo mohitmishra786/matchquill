@@ -34,7 +34,7 @@ simpler and costs the same (functions bill on active CPU + memory regardless of
 how many projects they're split across).
 
 > Vercel Services is in Beta but available on **all plans including Pro**. You
-> select it by setting the project's framework preset to **"Other"/Services** —
+> select it by setting the project's framework preset to **"Services"** —
 > Vercel reads `vercel.json` and provisions both services automatically.
 
 ---
@@ -55,8 +55,9 @@ You have three options:
    frontend renders/downloads output client-side.
 2. **Run the backend service as a container on Vercel** — change the backend
    service in `vercel.json` from `"framework": "fastapi"` to
-   `"runtime": "container"` and point it at the existing `backend/Dockerfile`
-   (which installs the native libs). Keeps everything in one project. This is the
+   `"runtime": "container"`, set `services.backend.root` to `"backend/"`, and
+   reference the Dockerfile using its service-relative name `"Dockerfile"` (which
+   installs the native libs). Keeps everything in one project. This is the
    recommended path if you need server-side PDFs. *(Not applied by default — it's
    a cost/behavior choice for you to make; container functions bill the same way
    but have different cold-start characteristics.)*
@@ -88,7 +89,7 @@ Set these in **Vercel → Project → Settings → Environment Variables** (Prod
 Preview). Full annotated list is in `.env.example`. The essentials:
 
 **Required**
-```
+```dotenv
 DATABASE_URL              # postgres connection string (Neon)
 REDIS_URL                 # or the UPSTASH_REDIS_RES_KV_REST_API_URL/TOKEN pair
 GROQ_API_KEY
@@ -98,14 +99,14 @@ NEXTAUTH_URL              # https://<your-domain>   (your final domain)
 
 **Same-origin URLs on Vercel** — these auto-resolve to `https://{VERCEL_URL}` when
 unset, but set them explicitly once you have a custom domain:
-```
+```dotenv
 FRONTEND_URL              # https://<your-domain>
 NEXT_PUBLIC_API_URL       # https://<your-domain>/api/py   (used by the extension/client)
 BACKEND_URL               # https://<your-domain>/api/py
 ```
 
 **Optional**
-```
+```dotenv
 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET      # OAuth
 STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET / STRIPE_PRICE_ID_PRO_MONTHLY
 FEATURE_FLAGS=semantic_matching              # only if you also install
@@ -120,7 +121,7 @@ SENTRY_DSN
 
 ## 5. Step-by-step deploy
 
-1. **Buy + prepare the domain.** Purchase `matchquill.com` (see
+1. **Buy + prepare the domain.** Purchase `<your-domain>` (see
    `docs/naming-decision.md` for the pre-purchase checklist). You can deploy on the
    auto-generated `*.vercel.app` domain first and add the custom domain later.
 
@@ -131,11 +132,11 @@ SENTRY_DSN
    - Framework preset: let Vercel detect Services from `vercel.json` (or set to
      "Other").
 
-3. **Add environment variables** (§4) for Production and Preview, then trigger a
-   deploy.
+3. **Add environment variables** (§4) for Production and Preview.
 
-4. **Run the database migration** against the production DB (one-time, and after
-   any schema change). Locally, with the production `DATABASE_URL` exported:
+4. **Run the database migration** against the production DB before promoting the
+   deploy (one-time, and after any schema change). Locally, with the production
+   `DATABASE_URL` exported:
    ```bash
    cd frontend
    npx prisma migrate deploy
@@ -143,20 +144,23 @@ SENTRY_DSN
    > The `subscriptionTier` migration from the monetization work needs this. It is
    > hand-written — review it before running against a real database.
 
-5. **Verify the deploy.**
+5. **Trigger the deploy.** With the schema ready, trigger a deploy from Vercel
+   Dashboard or push to the connected branch.
+
+6. **Verify the deploy.**
    ```bash
    curl https://<your-domain>/api/py/health      # backend health (expect JSON: healthy)
    ```
    Open `https://<your-domain>/` for the frontend. Confirm login works
    (`NEXTAUTH_URL` must match the domain exactly).
 
-6. **Attach the custom domain.** Vercel → Settings → Domains → add
-   `matchquill.com`, follow the DNS instructions (Vercel provides the A/CNAME
+7. **Attach the custom domain.** Vercel → Settings → Domains → add
+   `<your-domain>`, follow the DNS instructions (Vercel provides the A/CNAME
    records), then update `NEXTAUTH_URL`/`FRONTEND_URL`/`NEXT_PUBLIC_API_URL` to the
    custom domain and redeploy.
 
-7. **Point the Chrome extension** at production: set `NEXT_PUBLIC_API_URL` (and the
-   extension's host permissions / config) to `https://matchquill.com/api/py` before
+8. **Point the Chrome extension** at production: set `NEXT_PUBLIC_API_URL` (and the
+   extension's host permissions / config) to `https://<your-domain>/api/py` before
    publishing the Web Store listing.
 
 ---
@@ -165,8 +169,8 @@ SENTRY_DSN
 
 From [Vercel Functions limits](https://vercel.com/docs/functions/limitations):
 
-- **Max duration:** 300s default, up to **800s** on Pro. `vercel.json` sets
-  `maxDuration: 300` for the backend — fine as-is.
+- **Max duration:** 300s default for Fluid Compute, up to **800s** on Pro.
+  `vercel.json` sets `maxDuration: 300` for the backend — fine as-is.
 - **Memory:** up to 4 GB / 2 vCPU on Pro.
 - **Request/response body:** **4.5 MB** max. Resume uploads must stay under this
   (`MAX_UPLOAD_BYTES` defaults to 4 MB — keep it there).
