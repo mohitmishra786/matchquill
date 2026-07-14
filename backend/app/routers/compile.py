@@ -108,6 +108,7 @@ async def compile_resume(
         "job_description_length": job_description_length,
         "template": resume_request.template,
         "auth_source": auth_source,
+        "ats_type": resume_request.ats_type,
     })
     
     try:

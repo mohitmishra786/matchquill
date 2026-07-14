@@ -21,7 +21,14 @@
         "*://*.lever.co/*",
         "*://*.workday.com/*",
         "*://*.ziprecruiter.com/*",
-        "*://*.monster.com/*"
+        "*://*.monster.com/*",
+        "*://*.naukri.com/*",
+        "*://*.wellfound.com/*",
+        "*://*.angel.co/*",
+        "*://*.ashbyhq.com/*",
+        "*://*.smartrecruiters.com/*",
+        "*://*.icims.com/*",
+        "*://*.workable.com/*"
     ],
     "background": {
         "service_worker": "background/service-worker.js",
@@ -38,12 +45,31 @@
                 "*://*.lever.co/*",
                 "*://*.workday.com/*/job/*",
                 "*://*.ziprecruiter.com/jobs/*",
-                "*://*.monster.com/job-openings/*"
+                "*://*.ziprecruiter.com/c/*",
+                "*://*.monster.com/job-openings/*",
+                "*://*.naukri.com/job-listings-*",
+                "*://*.wellfound.com/jobs/*",
+                "*://*.wellfound.com/company/*",
+                "*://*.angel.co/company/*",
+                "*://jobs.ashbyhq.com/*",
+                "*://*.smartrecruiters.com/*",
+                "*://apply.workable.com/*",
+                "*://*.workable.com/j/*"
             ],
             "js": [
                 "content/job-extractor.js"
             ],
             "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "*://*.icims.com/*"
+            ],
+            "js": [
+                "content/job-extractor.js"
+            ],
+            "run_at": "document_idle",
+            "all_frames": true
         },
         {
             "matches": [

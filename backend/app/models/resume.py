@@ -41,7 +41,16 @@ class ResumeRequest(BaseModel):
         default=None,
         description="Template to use. If not provided, uses user's saved preference.",
     )
-    
+    ats_type: Optional[str] = Field(
+        default=None,
+        alias="atsType",
+        description=(
+            "Job board / ATS identifier the description was extracted from "
+            "(e.g. 'greenhouse', 'ashby', 'linkedin'). Optional metadata sent "
+            "by the browser extension; not used in compilation logic."
+        ),
+    )
+
     class Config:
         populate_by_name = True
 

@@ -120,7 +120,7 @@ async function getConfigWithCache() {
  * Compile resume via API
  */
 async function handleCompileResume(payload) {
-    const { jobDescription, template } = payload;
+    const { jobDescription, template, atsType } = payload;
 
     // Get auth token from storage
     const token = await getStoredAuthToken();
@@ -139,6 +139,11 @@ async function handleCompileResume(payload) {
             authToken: token,
             jobDescription: jobDescription,
             template: template,
+            // Additive field: identifies the job board/ATS the description
+            // was extracted from (e.g. "greenhouse", "ashby"). Backend treats
+            // it as optional metadata, so older clients that omit it are
+            // unaffected.
+            atsType: atsType || null,
         }),
     });
 
@@ -162,7 +167,7 @@ async function handleCompileResume(payload) {
  * Generate cover letter via API
  */
 async function handleGenerateCoverLetter(payload) {
-    const { jobDescription, tone, maxWords } = payload;
+    const { jobDescription, tone, maxWords, atsType } = payload;
 
     const token = await getStoredAuthToken();
 
@@ -181,6 +186,8 @@ async function handleGenerateCoverLetter(payload) {
             jobDescription: jobDescription,
             tone: tone || 'professional',
             maxWords: maxWords || 400,
+            // Additive field, see handleCompileResume for rationale.
+            atsType: atsType || null,
         }),
     });
 

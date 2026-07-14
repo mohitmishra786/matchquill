@@ -37,7 +37,16 @@ class CoverLetterRequest(BaseModel):
         ge=100,
         le=1000,
     )
-    
+    ats_type: Optional[str] = Field(
+        default=None,
+        alias="atsType",
+        description=(
+            "Job board / ATS identifier the description was extracted from "
+            "(e.g. 'greenhouse', 'ashby', 'linkedin'). Optional metadata sent "
+            "by the browser extension; not used in generation logic."
+        ),
+    )
+
     class Config:
         populate_by_name = True
 

@@ -107,6 +107,7 @@ async def generate_cover_letter(
         "tone": cover_request.tone,
         "max_words": cover_request.max_words,
         "auth_source": auth_source,
+        "ats_type": cover_request.ats_type,
     })
     
     try:

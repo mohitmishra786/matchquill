@@ -189,6 +189,7 @@ async function handleCompileResume() {
         const result = await sendMessage('COMPILE_RESUME', {
             jobDescription: currentJob.jobDescription,
             template: elements.templateSelect.value,
+            atsType: currentJob.atsType || currentJob.jobBoard || null,
         });
 
         if (result.success) {
@@ -221,6 +222,7 @@ async function handleGenerateCoverLetter() {
             jobDescription: currentJob.jobDescription,
             tone: 'professional',
             maxWords: 400,
+            atsType: currentJob.atsType || currentJob.jobBoard || null,
         });
 
         if (result.success) {

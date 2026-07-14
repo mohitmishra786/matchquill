@@ -83,6 +83,154 @@
                 '.posting-categories .sort-by-commitment',
             ],
         },
+        // UNVERIFIED — needs live DOM check. Naukri uses CSS-modules with hashed
+        // class suffixes (e.g. "styles_xxx__hAsH") that shift between deploys, so
+        // these exact classes are expected to go stale fastest. The `[class*=]`
+        // fallbacks are intentionally loose to survive hash rotation.
+        naukri: {
+            description: [
+                '.styles_JDC__dang-inner-html__h0K4t',
+                '[class*="JDC__dang-inner-html"]',
+                '[class*="job-desc"]',
+                '.job-desc',
+            ],
+            title: [
+                '.styles_jd-header-title__rZwM1',
+                '[class*="jd-header-title"]',
+                'h1[class*="title"]',
+            ],
+            company: [
+                '.styles_jd-header-comp-name__MvqAI',
+                '[class*="jd-header-comp-name"]',
+                '[class*="comp-name"]',
+            ],
+        },
+        // UNVERIFIED — needs live DOM check. Wellfound (formerly AngelList Talent)
+        // is a heavily JS-rendered React SPA; could not confirm selectors via
+        // static fetch. `data-test` attributes are a best guess based on
+        // Wellfound's general use of `data-test` hooks across the product.
+        wellfound: {
+            description: [
+                '[data-test="JobDescription"]',
+                '[data-test*="description" i]',
+                '[class*="description" i]',
+            ],
+            title: [
+                '[data-test="JobTitle"]',
+                '[data-test*="title" i] h1',
+                'h1',
+            ],
+            company: [
+                '[data-test="StartupName"]',
+                '[data-test*="company" i]',
+                '[class*="company" i]',
+            ],
+        },
+        // UNVERIFIED — needs live DOM check. ZipRecruiter already had
+        // host_permissions/manifest matches before this change but no selectors
+        // were ever wired up (silently fell back to `generic`).
+        ziprecruiter: {
+            description: [
+                '.job_description',
+                '#job-description',
+                '[class*="jobDescriptionSection"]',
+                '[class*="description"]',
+            ],
+            title: [
+                'h1.job_title',
+                '[data-testid="job-title"]',
+                'h1[class*="title"]',
+            ],
+            company: [
+                '.hiring_company_text',
+                '.job_company',
+                '[class*="company"]',
+            ],
+        },
+        // UNVERIFIED — needs live DOM check. Ashby's frontend uses vanilla-extract
+        // CSS-in-JS with hashed class names (e.g. "_descriptionText_kb2b1_10"),
+        // among the least stable of any ATS in this list. Prefer the `h1`/id
+        // fallbacks since Ashby job pages typically render a single `h1` for
+        // the posting title.
+        ashby: {
+            description: [
+                '[class*="_descriptionText_"]',
+                '.ashby-job-posting-body',
+                '[class*="description" i]',
+            ],
+            title: [
+                'h1[class*="_title_"]',
+                'h1',
+            ],
+            company: [
+                '[class*="_companyName_"]',
+                '[class*="company" i]',
+            ],
+        },
+        // UNVERIFIED — needs live DOM check. SmartRecruiters career pages
+        // sometimes render schema.org JobPosting microdata (itemprop attrs),
+        // which tend to be more durable since they back Google Jobs indexing.
+        smartrecruiters: {
+            description: [
+                '[itemprop="description"]',
+                '#job-description',
+                '.job-sections',
+                '[class*="description" i]',
+            ],
+            title: [
+                '[itemprop="title"]',
+                'h1[class*="job-title" i]',
+                'h1',
+            ],
+            company: [
+                '[itemprop="hiringOrganization"]',
+                '[class*="company-name" i]',
+            ],
+        },
+        // UNVERIFIED — needs live DOM check. iCIMS-hosted career pages
+        // historically render job content inside a same-origin iframe
+        // (commonly `#icims_content_iframe`). `all_frames: true` is set for
+        // this content script in manifest.json specifically so it can also
+        // run inside that iframe; without it, extraction on iCIMS sites would
+        // silently fail on the top-level (empty) frame.
+        icims: {
+            description: [
+                '.iCIMS_JobContent',
+                '#iCIMS_JobContent',
+                '.iCIMS_InfoMsg_Job',
+                '[class*="iCIMS_JobContent"]',
+            ],
+            title: [
+                '.iCIMS_JobHeaderTitle',
+                'h1.iCIMS_Header',
+                '[class*="iCIMS_JobHeaderTitle"]',
+            ],
+            company: [
+                '.iCIMS_CompanyName',
+                '[class*="iCIMS_Company"]',
+            ],
+        },
+        // UNVERIFIED — needs live DOM check. Workable's public widget docs
+        // reference `data-ui` hooks for styling overrides (e.g.
+        // `data-ui="job-description"`); best-effort based on that, not a live
+        // DOM confirmation.
+        workable: {
+            description: [
+                '[data-ui="job-description"]',
+                '[data-ui*="description"]',
+                '[class*="description" i]',
+            ],
+            title: [
+                '[data-ui="job-title"]',
+                'h1[data-ui*="title"]',
+                'h1',
+            ],
+            company: [
+                '[data-ui="company-name"]',
+                '[data-ui*="company"]',
+                '[class*="company" i]',
+            ],
+        },
         generic: {
             description: [
                 '[class*="job-description"]',
@@ -115,6 +263,14 @@
         if (hostname === 'glassdoor.com' || hostname.endsWith('.glassdoor.com')) return 'glassdoor';
         if (hostname === 'greenhouse.io' || hostname.endsWith('.greenhouse.io')) return 'greenhouse';
         if (hostname === 'lever.co' || hostname.endsWith('.lever.co')) return 'lever';
+        if (hostname === 'naukri.com' || hostname.endsWith('.naukri.com')) return 'naukri';
+        if (hostname === 'wellfound.com' || hostname.endsWith('.wellfound.com')
+            || hostname === 'angel.co' || hostname.endsWith('.angel.co')) return 'wellfound';
+        if (hostname === 'ziprecruiter.com' || hostname.endsWith('.ziprecruiter.com')) return 'ziprecruiter';
+        if (hostname === 'ashbyhq.com' || hostname.endsWith('.ashbyhq.com')) return 'ashby';
+        if (hostname === 'smartrecruiters.com' || hostname.endsWith('.smartrecruiters.com')) return 'smartrecruiters';
+        if (hostname === 'icims.com' || hostname.endsWith('.icims.com')) return 'icims';
+        if (hostname === 'workable.com' || hostname.endsWith('.workable.com')) return 'workable';
 
         return 'generic';
     }
@@ -199,6 +355,7 @@
                     company: "Manual Selection",
                     url: window.location.href,
                     jobBoard: "manual",
+                    atsType: "manual",
                     extractedAt: new Date().toISOString()
                 };
                 sendToBackground(data);
@@ -255,6 +412,12 @@
             company: company,
             url: window.location.href,
             jobBoard: jobBoard,
+            // ATS identifier, explicitly named for backend consumers that key
+            // off the hiring platform rather than the display name of the site
+            // (currently mirrors `jobBoard`, kept as its own field so the two
+            // can diverge later, e.g. if a single ATS is detected across
+            // multiple custom-domain career sites).
+            atsType: jobBoard,
             extractedAt: new Date().toISOString(),
         };
     }
@@ -413,6 +576,31 @@
      */
     function init() {
         console.log('[MatchQuill] Content script initialized');
+
+        // Some ATS platforms (e.g. iCIMS) load job content inside a
+        // same-origin iframe, so this script is injected with
+        // `all_frames: true` on those hosts to reach it. The floating UI
+        // (button/overlay/notifications) should only ever render once per
+        // page, so it's restricted to the top frame; extraction still runs
+        // in every frame so it can find the description wherever it lives.
+        const isTopFrame = window.self === window.top;
+
+        if (!isTopFrame) {
+            // Auto-extract on page load from this frame only; UI lives in the
+            // top frame.
+            setTimeout(() => {
+                const data = extractJobDescription();
+                if (data) {
+                    chrome.storage.local.set({
+                        lastExtractedJob: data,
+                        lastExtractedAt: Date.now(),
+                    });
+                    console.log('[MatchQuill] Job description auto-extracted and cached (iframe)');
+                }
+            }, 1500);
+            return;
+        }
+
         addStyles();
 
         // Wait for page to load fully
@@ -442,7 +630,9 @@
         module.exports = {
             JOB_SELECTORS,
             detectJobBoard,
-            extractText
+            extractText,
+            extractJobDescription,
+            findElement
         };
     }
 })();
