@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Briefcase, FolderKanban, GraduationCap, ShieldAlert, Sparkles, Zap } from 'lucide-react';
+import { Briefcase, FolderKanban, GraduationCap, ShieldAlert, Sparkles, User, Zap } from 'lucide-react';
 import { UserProfile } from '@/types';
 
 export default function PublicProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,17 +61,33 @@ export default function PublicProfilePage({ params }: { params: Promise<{ id: st
                             <ShieldAlert size={26} strokeWidth={1.75} style={{ color: 'var(--muted-foreground)' }} />
                         </div>
                         <h1 className="text-xl font-bold mb-2" style={{ color: 'var(--foreground)', fontFamily: 'var(--font-display)' }}>
-                            {error === 'This profile is private' ? 'Private profile' : 'Profile unavailable'}
+                            {error === 'This profile is private'
+                                ? 'Private profile'
+                                : error === 'Profile not found'
+                                    ? 'Profile not found'
+                                    : 'Something went wrong'}
                         </h1>
                         <p style={{ color: 'var(--muted-foreground)' }}>
                             {error === 'This profile is private'
                                 ? 'The user has restricted access to this profile.'
-                                : 'The profile you are looking for does not exist or has been removed.'}
+                                : error === 'Profile not found'
+                                    ? 'This profile does not exist or has been removed.'
+                                    : 'We could not load this profile right now. Please try again.'}
                         </p>
+                        {error !== 'This profile is private' && error !== 'Profile not found' && (
+                            <button
+                                type="button"
+                                onClick={() => window.location.reload()}
+                                className="mt-6 inline-flex items-center justify-center px-6 py-3 min-h-[44px] font-semibold rounded-full transition-all hover:opacity-90"
+                                style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                            >
+                                Try again
+                            </button>
+                        )}
                         <Link
                             href="/"
-                            className="mt-6 inline-flex items-center justify-center px-6 py-3 min-h-[44px] font-semibold rounded-full transition-all hover:opacity-90"
-                            style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                            className="mt-3 inline-flex items-center justify-center px-6 py-3 min-h-[44px] font-semibold rounded-full transition-all hover:opacity-80"
+                            style={{ color: 'var(--foreground-secondary)' }}
                         >
                             Go home
                         </Link>
@@ -110,7 +126,9 @@ export default function PublicProfilePage({ params }: { params: Promise<{ id: st
                                             className="w-full h-full flex items-center justify-center text-4xl font-bold"
                                             style={{ background: 'var(--muted)', color: 'var(--primary)' }}
                                         >
-                                            {profile.name?.[0] || 'U'}
+                                            {profile.name?.trim()
+                                                ? profile.name.trim()[0].toUpperCase()
+                                                : <User size={40} strokeWidth={1.75} aria-hidden="true" />}
                                         </div>
                                     )}
                                 </div>
@@ -157,8 +175,10 @@ export default function PublicProfilePage({ params }: { params: Promise<{ id: st
                                                     {exp.company}
                                                 </div>
                                                 <div className="text-sm mb-3" style={{ color: 'var(--muted-foreground)' }}>
-                                                    {new Date(exp.startDate).getFullYear()} -{' '}
-                                                    {exp.current ? 'Present' : exp.endDate ? new Date(exp.endDate).getFullYear() : ''}
+                                                    {new Date(exp.startDate).getFullYear()}
+                                                    {exp.current
+                                                        ? ' - Present'
+                                                        : exp.endDate ? ` - ${new Date(exp.endDate).getFullYear()}` : ''}
                                                 </div>
                                                 {exp.description && (
                                                     <p className="text-sm whitespace-pre-line" style={{ color: 'var(--foreground-secondary)' }}>

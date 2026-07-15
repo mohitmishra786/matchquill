@@ -122,7 +122,7 @@ export default function Home() {
   return (
     <div className="relative min-h-screen overflow-hidden" style={{ background: 'var(--background)' }}>
       {/* 3D hero layer — fixed, behind all content, purely decorative */}
-      <ThreeCanvas isDark={isDark} />
+      <ThreeCanvas isDark={isDark} reduceMotion={reduceMotion} />
 
       {/* Hero */}
       <section className="relative z-10 pt-28 pb-24 px-4 sm:pt-36 sm:pb-32">
@@ -188,7 +188,12 @@ export default function Home() {
             variants={heroReveal3}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10"
           >
-            {isAuthenticated ? (
+            {status === 'loading' ? (
+              <>
+                <div className="w-full sm:w-56 h-[52px] rounded-full animate-pulse" style={{ background: 'var(--muted)' }} aria-hidden="true" />
+                <div className="w-full sm:w-36 h-[52px] rounded-full animate-pulse" style={{ background: 'var(--muted)' }} aria-hidden="true" />
+              </>
+            ) : isAuthenticated ? (
               <>
                 <Link
                   href="/dashboard"
@@ -404,13 +409,17 @@ export default function Home() {
               >
                 Build your profile once. Tailor it for every application after that.
               </p>
-              <Link
-                href={isAuthenticated ? '/dashboard' : '/register'}
-                className="inline-flex items-center gap-2 px-8 py-3.5 min-h-[44px] font-semibold rounded-full transition-all text-lg hover:opacity-90 active:scale-[0.98]"
-                style={{ background: 'var(--card)', color: 'var(--primary)' }}
-              >
-                {isAuthenticated ? 'Go to Dashboard' : 'Start Free Today'}
-              </Link>
+              {status === 'loading' ? (
+                <div className="inline-block w-48 h-[52px] rounded-full animate-pulse" style={{ background: 'rgba(255,255,255,0.25)' }} aria-hidden="true" />
+              ) : (
+                <Link
+                  href={isAuthenticated ? '/dashboard' : '/register'}
+                  className="inline-flex items-center gap-2 px-8 py-3.5 min-h-[44px] font-semibold rounded-full transition-all text-lg hover:opacity-90 active:scale-[0.98]"
+                  style={{ background: 'var(--card)', color: 'var(--primary)' }}
+                >
+                  {isAuthenticated ? 'Go to Dashboard' : 'Start Free Today'}
+                </Link>
+              )}
             </div>
           </div>
         </motion.div>

@@ -98,7 +98,7 @@ const Navbar: React.FC = () => {
 
                                 {/* Desktop Navigation Links (only if logged in) */}
                                 {session && (
-                                    <div className="hidden md:flex items-center gap-1">
+                                    <div className="hidden lg:flex items-center gap-1">
                                         <Link href="/dashboard" className={navLinkClass('/dashboard')}>
                                             Dashboard
                                         </Link>
@@ -129,7 +129,7 @@ const Navbar: React.FC = () => {
 
                                 {/* Not Logged In */}
                                 {!isLoading && !session && (
-                                    <div className="hidden md:flex items-center gap-2">
+                                    <div className="hidden lg:flex items-center gap-2">
                                         <Link href="/pricing" className={navLinkClass('/pricing')}>
                                             Pricing
                                         </Link>
@@ -159,7 +159,7 @@ const Navbar: React.FC = () => {
 
                                 {/* Logged In */}
                                 {!isLoading && session && (
-                                    <div className="hidden md:flex items-center gap-2">
+                                    <div className="hidden lg:flex items-center gap-2">
                                         {/* User Info */}
                                         <Link
                                             href="/profile"
@@ -198,7 +198,7 @@ const Navbar: React.FC = () => {
                                 {/* Mobile Menu Button */}
                                 <button
                                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                                    className="md:hidden flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200"
+                                    className="lg:hidden flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200"
                                     style={{
                                         background: isMobileMenuOpen ? 'var(--muted)' : 'transparent',
                                         color: 'var(--foreground)',
@@ -222,7 +222,7 @@ const Navbar: React.FC = () => {
             {isMobileMenuOpen && (
                 <div
                     id="navbar-mobile-menu"
-                    className="fixed inset-x-3 top-[4.5rem] z-40 md:hidden animate-fade-in rounded-3xl overflow-hidden"
+                    className="fixed inset-x-3 top-[4.5rem] z-40 lg:hidden animate-fade-in rounded-3xl overflow-hidden"
                     style={{
                         background: 'var(--glass-bg)',
                         backdropFilter: 'blur(var(--glass-blur))',

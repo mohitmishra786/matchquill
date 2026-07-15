@@ -32,6 +32,7 @@ const Footer: React.FC = () => {
                             style={{ color: 'var(--foreground)', fontFamily: 'var(--font-display)' }}
                         >
                             <span
+                                aria-hidden="true"
                                 className="flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold"
                                 style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
                             >

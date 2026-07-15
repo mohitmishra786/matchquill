@@ -102,7 +102,7 @@ export default async function PublicResumePage({ params }: Props) {
                           {exp.title}
                         </h3>
                         <span className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                          {new Date(exp.startDate).getFullYear()} - {exp.current ? 'Present' : exp.endDate ? new Date(exp.endDate).getFullYear() : ''}
+                          {new Date(exp.startDate).getFullYear()}{exp.current ? ' - Present' : exp.endDate ? ` - ${new Date(exp.endDate).getFullYear()}` : ''}
                         </span>
                       </div>
                       <p className="text-lg" style={{ color: 'var(--primary)' }}>{exp.company}</p>

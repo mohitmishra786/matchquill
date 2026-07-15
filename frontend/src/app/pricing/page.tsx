@@ -27,6 +27,10 @@ import { CheckCircle2, Sparkles, XCircle } from 'lucide-react';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+// Support/contact address for the Enterprise "contact us" CTA. Configurable per
+// deployment via NEXT_PUBLIC_SUPPORT_EMAIL; falls back to the default domain.
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'admin@mohitmishra7.com';
+
 /**
  * Content opacity is never the gate for visibility — it stays at 1 in both
  * the "hidden" and "visible" states, only translateY animates. Matches the
@@ -320,7 +324,7 @@ export default function PricingPage() {
                             </ul>
 
                             <a
-                                href="mailto:support@matchquill.com?subject=Enterprise%20plan%20inquiry"
+                                href={`mailto:${SUPPORT_EMAIL}?subject=Enterprise%20plan%20inquiry`}
                                 className="mt-8 w-full text-center px-6 py-3 min-h-[44px] flex items-center justify-center font-semibold rounded-full transition-all hover:opacity-80 border"
                                 style={{ borderColor: 'var(--border)', color: 'var(--foreground)', background: 'var(--card)' }}
                             >

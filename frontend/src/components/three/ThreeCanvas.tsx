@@ -9,13 +9,15 @@
  * mobile screens.
  */
 
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { SoftShadows } from '@react-three/drei';
 import Sculpture from './Sculpture';
 
 interface ThreeCanvasProps {
   isDark: boolean;
+  /** When true (prefers-reduced-motion), the ribbon renders a single static frame. */
+  reduceMotion?: boolean;
 }
 
 /** Points the default camera at the helix's visual center once on mount. */
@@ -30,12 +32,39 @@ function CameraRig() {
   return null;
 }
 
-export default function ThreeCanvas({ isDark }: ThreeCanvasProps) {
+export default function ThreeCanvas({ isDark, reduceMotion = false }: ThreeCanvasProps) {
+  // Pause the render loop once the hero scrolls out of view — the fixed canvas
+  // is then fully covered by page content, so animating it just wastes GPU.
+  const [heroVisible, setHeroVisible] = useState(true);
+  useEffect(() => {
+    let raf = 0;
+    const check = () => {
+      const next = window.scrollY < window.innerHeight * 1.2;
+      setHeroVisible((prev) => (prev !== next ? next : prev));
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(check);
+    };
+    check();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  // 'always' animates; 'never' still renders one frame on mount / prop change
+  // (so a static ribbon is shown), then stops — used when offscreen or when the
+  // visitor prefers reduced motion.
+  const animate = heroVisible && !reduceMotion;
+
   return (
     <div className="fixed inset-0 -z-0 pointer-events-none" aria-hidden="true">
       <Canvas
         shadows
         dpr={[1, 2]}
+        frameloop={animate ? 'always' : 'never'}
         gl={{ antialias: true, alpha: true }}
         camera={{ position: [11, 3.5, 13], fov: 42, near: 0.1, far: 60 }}
       >
