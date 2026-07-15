@@ -83,8 +83,9 @@ async def _with_retry(
                 },
             )
             await asyncio.sleep(delay)
-    assert last_error is not None
-    raise last_error
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError(f"[ProfileService] {operation} failed without error detail")
 
 
 async def close_shared_http_client():
@@ -221,7 +222,15 @@ class ProfileService:
     
     async def validate_token(self, auth_token: str) -> Optional[str]:
         """
-        Validate auth token and return user ID if valid.
+        Soft-check a service JWT against the Next.js app.
+
+        IMPORTANT: NextAuth ``GET /api/auth/session`` is **cookie-based**. It
+        ignores ``Authorization: Bearer`` and returns JSON ``null`` for service
+        tokens minted by the frontend (``generateBackendToken``). Callers that
+        already verified the JWT signature must treat a ``None`` result as
+        "session endpoint unavailable", not "user deleted".
+
+        Returns user id when a real session object is present; otherwise None.
         """
         request_id = get_request_id()
         start_time = time.time()
@@ -232,7 +241,10 @@ class ProfileService:
         })
         
         try:
-            logger.debug("Validating auth token", {"request_id": request_id})
+            logger.debug("Validating auth token via frontend session API", {
+                "request_id": request_id,
+                "url": f"{self.base_url}/api/auth/session",
+            })
             
             client = await get_shared_http_client()
             response = await client.get(
@@ -252,9 +264,37 @@ class ProfileService:
                 })
                 log_auth_operation("token:validate", success=False)
                 return None
-            
-            session = response.json()
-            user_id = session.get("user", {}).get("id")
+
+            # NextAuth returns bare `null` when there is no cookie session
+            # (Bearer service JWTs never create a cookie session).
+            try:
+                session = response.json()
+            except Exception:
+                logger.warning("Token validation: non-JSON session body", {
+                    "request_id": request_id,
+                    "duration_ms": duration_ms,
+                })
+                return None
+
+            if not isinstance(session, dict):
+                logger.info(
+                    "Token validation: no cookie session "
+                    "(expected for Bearer service JWTs)",
+                    {
+                        "request_id": request_id,
+                        "body_type": type(session).__name__,
+                        "duration_ms": duration_ms,
+                    },
+                )
+                log_auth_operation(
+                    "token:validate",
+                    success=False,
+                    data={"reason": "no_cookie_session"},
+                )
+                return None
+
+            user = session.get("user") if isinstance(session.get("user"), dict) else {}
+            user_id = user.get("id") if user else None
             
             logger.end_operation("ProfileService.validate_token", duration_ms, {
                 "request_id": request_id,
@@ -262,9 +302,9 @@ class ProfileService:
                 "success": bool(user_id),
             })
             
-            log_auth_operation("token:validate", user_id=user_id, success=True)
+            log_auth_operation("token:validate", user_id=user_id, success=bool(user_id))
             
-            return user_id
+            return user_id if user_id else None
             
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000

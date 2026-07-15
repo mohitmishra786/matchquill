@@ -118,24 +118,21 @@ async def verify_auth_token_with_db(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> str:
     """
-    Verify JWT auth token from Authorization header with database validation.
+    Verify JWT auth token from Authorization header for service-to-service calls.
 
-    This enhanced version validates:
-    1. JWT signature and expiration
-    2. User exists in the database (via ProfileService)
-    3. User account is active
+    Validation steps:
+    1. JWT signature + expiration (shared AUTH_SECRET / NEXTAUTH_SECRET)
+    2. Require ``sub`` (user id) claim
+    3. Optional soft-check via Next.js session API (cookie-only; usually N/A
+       for Bearer service tokens minted by the frontend after login)
 
-    Results are cached briefly (by token hash) to avoid repeated session
-    lookups on high-frequency AI/upload routes.
+    Service tokens are minted by Vercel only after a valid NextAuth session, so
+    a signature-verified JWT is sufficient proof of identity. Treating a null
+    session soft-check as "user not found" was a production bug that blocked
+    resume upload after secrets were aligned.
 
-    Args:
-        credentials: HTTP Bearer credentials
-
-    Returns:
-        User ID from token
-
-    Raises:
-        HTTPException: If token is invalid, missing, or user not found in database
+    Results are cached briefly (by token hash) to avoid repeat work on
+    high-frequency AI/upload routes.
     """
     if credentials is None:
         logger.warning("Auth failed: Missing credentials")
@@ -158,6 +155,7 @@ async def verify_auth_token_with_db(
                 status_code=401,
                 detail="Invalid token: missing subject",
             )
+        user_id = str(user_id)
 
         # Fast path: recently validated token
         cached_user_id = _get_cached_user_id(token)
@@ -174,40 +172,36 @@ async def verify_auth_token_with_db(
                 })
                 return user_id
 
-        # Database validation: verify user exists and is active
+        # Soft session check (NextAuth cookie API — usually empty for Bearer JWTs)
         from app.services.profile_service import ProfileService
         profile_service = ProfileService()
 
         try:
             validated_user_id = await profile_service.validate_token(token)
 
-            if validated_user_id is None:
-                logger.warning("Auth failed: User not found in database or inactive", {
-                    "user_id": user_id,
-                    "token_prefix": token[:16],
-                })
-                raise HTTPException(
-                    status_code=401,
-                    detail="User not found or account inactive",
-                )
-
-            # Ensure user IDs match
-            if validated_user_id != user_id:
+            if validated_user_id is not None and str(validated_user_id) != user_id:
                 logger.warning("Auth failed: User ID mismatch", {
                     "token_user_id": user_id,
-                    "db_user_id": validated_user_id,
+                    "session_user_id": validated_user_id,
                 })
                 raise HTTPException(
                     status_code=401,
                     detail="Token user ID does not match database",
                 )
 
+            if validated_user_id is None:
+                # Expected for service JWTs: /api/auth/session ignores Bearer.
+                logger.info(
+                    "Auth success with verified service JWT "
+                    "(session soft-check unavailable for Bearer tokens)",
+                    {"user_id": user_id},
+                )
+            else:
+                logger.debug("Auth success with session soft-check", {
+                    "user_id": user_id,
+                })
+
             _set_cached_user_id(token, user_id)
-
-            logger.debug("Auth success with database validation", {
-                "user_id": user_id,
-            })
-
             return user_id
 
         finally:
