@@ -5,7 +5,7 @@
  * Supports Google OAuth and email/password login
  */
 
-import { useState, Suspense, useEffect } from 'react';
+import { useState, Suspense, useMemo } from 'react';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -36,24 +36,25 @@ function revealVariants(delay = 0, reduceMotion = false): Variants {
 function LoginForm() {
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get('callbackUrl') || '/profile';
+    // Auth.js redirects land on /login?error=Configuration (etc.) — derive, don't sync via effect.
+    const urlErrorCode = searchParams.get('error');
+    const urlError = useMemo(
+        () => (urlErrorCode ? authErrorMessage(urlErrorCode) : ''),
+        [urlErrorCode]
+    );
     const reduceMotion = Boolean(useReducedMotion());
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
+    /** Errors from the current submit attempt; takes precedence over ?error= from the URL. */
+    const [submitError, setSubmitError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Surface Auth.js redirects like /login?error=Configuration
-    useEffect(() => {
-        const code = searchParams.get('error');
-        if (code) {
-            setError(authErrorMessage(code));
-        }
-    }, [searchParams]);
+    const error = submitError || urlError;
 
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
+        setSubmitError('');
         setLoading(true);
 
         try {
@@ -67,12 +68,14 @@ function LoginForm() {
             // Auth.js returns HTTP 200 even when url contains ?error=…
             // Prefer explicit error; also reject ok:false / missing url.
             if (result?.error) {
-                setError(authErrorMessage(result.error));
+                setSubmitError(authErrorMessage(result.error));
+                setLoading(false);
                 return;
             }
 
             if (!result?.ok || !result.url) {
-                setError('Sign-in failed. Please check your email and password.');
+                setSubmitError('Sign-in failed. Please check your email and password.');
+                setLoading(false);
                 return;
             }
 
@@ -86,7 +89,7 @@ function LoginForm() {
                       : '/profile';
             window.location.assign(dest);
         } catch {
-            setError('An error occurred. Please try again.');
+            setSubmitError('An error occurred. Please try again.');
             setLoading(false);
         }
         // Keep loading=true on success until full page navigation completes.
