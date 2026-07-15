@@ -133,12 +133,12 @@ export default function Home() {
             re-composite every frame; this is a flat alpha blend instead. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 w-[min(96%,44rem)] h-[30rem] -z-[1]"
+          className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 w-[min(100%,52rem)] h-[38rem] -z-[1]"
           style={{
             background: 'var(--background)',
-            opacity: isDark ? 0.86 : 0.92,
-            WebkitMaskImage: 'radial-gradient(55% 55% at 50% 40%, black 45%, transparent 100%)',
-            maskImage: 'radial-gradient(55% 55% at 50% 40%, black 45%, transparent 100%)',
+            opacity: isDark ? 0.95 : 0.98,
+            WebkitMaskImage: 'radial-gradient(68% 62% at 50% 46%, black 62%, transparent 100%)',
+            maskImage: 'radial-gradient(68% 62% at 50% 46%, black 62%, transparent 100%)',
           }}
         />
         <div className="max-w-3xl mx-auto text-center px-4">
@@ -175,7 +175,7 @@ export default function Home() {
             animate="visible"
             variants={heroReveal3}
             className="mt-6 text-lg sm:text-xl max-w-xl mx-auto"
-            style={{ color: 'var(--muted-foreground)', textWrap: 'pretty' }}
+            style={{ color: 'var(--foreground-secondary)', textWrap: 'pretty' }}
           >
             MatchQuill reads job postings where you already browse, matches them against a
             profile you control, and compiles a resume built only from things you&rsquo;ve
