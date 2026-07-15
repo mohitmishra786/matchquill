@@ -8,6 +8,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { BrandLogo } from './BrandLogo';
 
 const Footer: React.FC = () => {
     const current_year = new Date().getFullYear();
@@ -26,20 +27,7 @@ const Footer: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-12">
                     {/* Brand */}
                     <div>
-                        <Link
-                            href="/"
-                            className="inline-flex items-center gap-2 text-lg font-bold mb-3"
-                            style={{ color: 'var(--foreground)', fontFamily: 'var(--font-display)' }}
-                        >
-                            <span
-                                aria-hidden="true"
-                                className="flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold"
-                                style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
-                            >
-                                M
-                            </span>
-                            MatchQuill
-                        </Link>
+                        <BrandLogo size={28} className="mb-3 text-lg" wordmarkClassName="text-lg" />
                         <p
                             className="text-sm leading-relaxed max-w-xs"
                             style={{ color: 'var(--muted-foreground)' }}

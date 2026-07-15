@@ -15,7 +15,8 @@ import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
-import { Home, User, LogOut, LogIn, Menu, X } from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
+import { User, LogOut, LogIn, Menu, X } from 'lucide-react';
 import { logger } from '@/lib/logger';
 
 const EASE = 'cubic-bezier(0.32,0.72,0,1)';
@@ -82,33 +83,25 @@ const Navbar: React.FC = () => {
                         <div className="flex items-center justify-between h-16">
                             {/* Left: Logo and Home */}
                             <div className="flex items-center gap-6">
-                                <Link
-                                    href="/"
-                                    className="flex items-center gap-2 text-xl font-bold transition-all duration-200 hover:opacity-80"
-                                    style={{ color: 'var(--foreground)', fontFamily: 'var(--font-display)' }}
-                                >
-                                    <span
-                                        className="flex items-center justify-center w-8 h-8 rounded-xl"
-                                        style={{ background: 'var(--primary)' }}
-                                    >
-                                        <Home size={16} strokeWidth={2} style={{ color: 'var(--primary-foreground)' }} />
-                                    </span>
-                                    <span className="hidden sm:inline">MatchQuill</span>
-                                </Link>
+                                <BrandLogo
+                                    size={32}
+                                    className="text-xl"
+                                    wordmarkClassName="hidden sm:inline text-xl"
+                                />
 
                                 {/* Desktop Navigation Links (only if logged in) */}
                                 {session && (
                                     <div className="hidden lg:flex items-center gap-1">
-                                        <Link href="/dashboard" className={navLinkClass('/dashboard')}>
+                                        <Link href="/dashboard" className={navLinkClass('/dashboard')} prefetch>
                                             Dashboard
                                         </Link>
-                                        <Link href="/profile" className={navLinkClass('/profile')}>
+                                        <Link href="/profile" className={navLinkClass('/profile')} prefetch>
                                             Profile
                                         </Link>
-                                        <Link href="/templates" className={navLinkClass('/templates')}>
+                                        <Link href="/templates" className={navLinkClass('/templates')} prefetch>
                                             Templates
                                         </Link>
-                                        <Link href="/pricing" className={navLinkClass('/pricing')}>
+                                        <Link href="/pricing" className={navLinkClass('/pricing')} prefetch>
                                             Pricing
                                         </Link>
                                     </div>

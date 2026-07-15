@@ -111,28 +111,37 @@ annotated list lives in `.env.example`.
 |---|---|---|
 | `DATABASE_URL` | Neon connection string | Prisma |
 | `NEXTAUTH_SECRET` | `openssl rand -base64 32` | **must match Railway's** |
-| `NEXTAUTH_URL` | `https://matchquill.com` | your final frontend domain |
-| `BACKEND_URL` | `https://<railway-domain>/api/py` | server-side proxy target |
-| `NEXT_PUBLIC_API_URL` | `https://<railway-domain>/api/py` | used by browser + extension |
-| `FRONTEND_URL` | `https://matchquill.com` | |
+| `NEXTAUTH_URL` | `https://matchquill.vercel.app` (or custom domain) | must match the live site origin |
+| `BACKEND_URL` | `https://<railway-domain>/api/py` | **required** for resume upload / AI proxy — **never** `localhost` |
+| `NEXT_PUBLIC_API_URL` | `https://<railway-domain>/api/py` | same Railway URL (browser + extension) — **never** `localhost` in production |
+| `FRONTEND_URL` | same as `NEXTAUTH_URL` | |
 | `GROQ_API_KEY` | Groq key | if any frontend route calls Groq directly |
-| `UPSTASH_REDIS_RES_KV_REST_API_URL` / `..._TOKEN` | Upstash REST pair | frontend rate limiting |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Upstash REST pair | optional frontend helpers |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth | optional |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID_PRO_MONTHLY` | Stripe | optional — see `monetization-decision.md` |
+
+> **Common production failure:** omitting `BACKEND_URL` on Vercel makes the upload proxy call
+> `https://<vercel-host>/api/py/...`, which returns the Next.js HTML 404 page and surfaces as
+> `PARSE_ERROR` / "Invalid response from parsing service".
 
 ### On Railway (backend)
 
 | Variable | Value | Notes |
 |---|---|---|
 | `DATABASE_URL` | **same Neon string** as Vercel | |
-| `REDIS_URL` | Upstash `redis://…` (or the REST pair) | cache + rate limiting |
+| `REDIS_URL` | Upstash `redis://…` / `rediss://…` | cache + rate limiting |
 | `GROQ_API_KEY` | Groq key | LLM inference |
 | `NEXTAUTH_SECRET` | **same value as Vercel** | backend validates the auth JWT |
-| `NEXTAUTH_URL` | `https://matchquill.com` | CORS origin |
-| `FRONTEND_URL` | `https://matchquill.com` | CORS + profile fetch |
-| `FRONTEND_API_URL` | `https://matchquill.com` | backend fetches profile from Next.js |
+| `NEXTAUTH_URL` | `https://matchquill.vercel.app` (or custom domain) | CORS origin |
+| `FRONTEND_URL` | same as `NEXTAUTH_URL` | CORS + profile fetch |
+| `FRONTEND_API_URL` | same as `NEXTAUTH_URL` | backend fetches profile from Next.js |
 
 > `PORT` is injected by Railway automatically — do **not** set it.
+>
+> Do **not** set `BACKEND_URL` or `NEXT_PUBLIC_API_URL` to `http://localhost:8000` on Railway —
+> those are local-dev values. Railway does not call itself via `BACKEND_URL`; Vercel does.
+> After deploy, open **Settings → Networking → Generate Domain**, then put that domain into
+> **Vercel** `BACKEND_URL` and `NEXT_PUBLIC_API_URL` as `https://<domain>/api/py`.
 
 ---
 

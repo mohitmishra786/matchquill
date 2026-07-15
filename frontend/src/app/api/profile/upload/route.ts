@@ -15,9 +15,57 @@ import { getBackendUrl } from '@/lib/backend-url';
 import { MAX_UPLOAD_BYTES } from '@/lib/constants';
 import { Prisma } from '@prisma/client';
 
+/** LLM resume parse can take 30–90s; allow Railway cold start + Groq. */
+export const maxDuration = 120;
+
+/** Backend fetch timeout (ms). */
+const BACKEND_FETCH_TIMEOUT_MS = 110_000;
+
+function looksLikeHtml(body: string): boolean {
+    const sample = body.slice(0, 200).trim().toLowerCase();
+    return sample.startsWith('<!doctype') || sample.startsWith('<html') || sample.includes('<head');
+}
+
+async function fetchBackendWithRetry(
+    endpoint: string,
+    init: RequestInit,
+    logger: ReturnType<typeof createRequestLogger>,
+    requestId: string,
+): Promise<Response> {
+    let lastError: unknown;
+    // One retry helps Railway cold-starts that drop the first connection.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), BACKEND_FETCH_TIMEOUT_MS);
+        try {
+            const response = await fetch(endpoint, {
+                ...init,
+                signal: controller.signal,
+            });
+            clearTimeout(timer);
+            return response;
+        } catch (err) {
+            clearTimeout(timer);
+            lastError = err;
+            const message = err instanceof Error ? err.message : String(err);
+            const aborted = err instanceof Error && err.name === 'AbortError';
+            logger.warn('[Upload] Backend fetch attempt failed', {
+                requestId,
+                attempt,
+                aborted,
+                error: message,
+            });
+            if (attempt < 2 && !aborted) {
+                await new Promise((r) => setTimeout(r, 800));
+                continue;
+            }
+            throw err;
+        }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 export async function POST(request: NextRequest) {
-
-
     const requestId = getOrCreateRequestId(request.headers);
     const logger = createRequestLogger(requestId);
 
@@ -114,53 +162,138 @@ export async function POST(request: NextRequest) {
         backendFormData.append('file', file);
         backendFormData.append('file_type', fileType);
 
-        const uploadEndpoint = getBackendUrl('/upload/resume');
-
-        // Forward to backend for parsing
-        logger.info('[Upload] Forwarding to backend', {
-            requestId,
-            userId,
-            backendUrl: uploadEndpoint,
-        });
-
-        let backendResponse: Response;
-
+        let uploadEndpoint: string;
         try {
-            backendResponse = await fetch(uploadEndpoint, {
-                method: 'POST',
-                body: backendFormData,
-                headers: {
-                    'X-Request-ID': requestId,
-                    'Authorization': `Bearer ${backendToken}`,
-                },
-            });
-        } catch (fetchError) {
-            const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
-
-            logger.error('[Upload] Backend connection failed', {
+            uploadEndpoint = getBackendUrl('/upload/resume');
+        } catch (urlError) {
+            const message = urlError instanceof Error ? urlError.message : String(urlError);
+            logger.error('[Upload] Invalid BACKEND_URL configuration', {
                 requestId,
                 userId,
-                error: errorMessage,
+                error: message,
             });
-
             return NextResponse.json(
                 {
                     success: false,
-                    error: 'Failed to connect to parsing service.',
+                    error:
+                        'Parsing service is not configured. Set BACKEND_URL on Vercel to your Railway public URL (https://<service>.up.railway.app/api/py).',
+                    details: {
+                        errorType: 'CONFIG_ERROR',
+                        message,
+                    },
                     requestId,
                 },
                 { status: 503 }
             );
         }
 
-        // Parse backend response
-        let backendData: Record<string, unknown>;
+        // Forward to backend for parsing
+        logger.info('[Upload] Forwarding to backend', {
+            requestId,
+            userId,
+            // Host only — avoid leaking full internal paths/tokens in logs
+            backendHost: (() => {
+                try {
+                    return new URL(uploadEndpoint).host;
+                } catch {
+                    return 'invalid';
+                }
+            })(),
+        });
+
+        let backendResponse: Response;
 
         try {
-            backendData = await backendResponse.json();
-        } catch (parseError) {
-            const responseText = await backendResponse.text().catch(() => 'Unable to read response');
+            backendResponse = await fetchBackendWithRetry(
+                uploadEndpoint,
+                {
+                    method: 'POST',
+                    body: backendFormData,
+                    headers: {
+                        'X-Request-ID': requestId,
+                        Authorization: `Bearer ${backendToken}`,
+                    },
+                },
+                logger,
+                requestId,
+            );
+        } catch (fetchError) {
+            const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
+            const timedOut = fetchError instanceof Error && fetchError.name === 'AbortError';
 
+            logger.error('[Upload] Backend connection failed', {
+                requestId,
+                userId,
+                timedOut,
+                error: errorMessage,
+            });
+
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: timedOut
+                        ? 'Parsing service timed out. The backend may be cold-starting — try again in a few seconds.'
+                        : 'Failed to connect to parsing service. Check that BACKEND_URL points at your live Railway API and that the service is running.',
+                    details: {
+                        errorType: timedOut ? 'TIMEOUT' : 'CONNECTION_ERROR',
+                        message: errorMessage,
+                    },
+                    requestId,
+                },
+                { status: 503 }
+            );
+        }
+
+        // Read body once as text, then JSON.parse — never double-read the stream
+        const responseText = await backendResponse.text();
+        let backendData: Record<string, unknown>;
+
+        if (!responseText.trim()) {
+            logger.error('[Upload] Empty backend response body', {
+                requestId,
+                userId,
+                status: backendResponse.status,
+            });
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: 'Parsing service returned an empty response.',
+                    details: {
+                        errorType: 'EMPTY_RESPONSE',
+                        status: backendResponse.status,
+                    },
+                    requestId,
+                },
+                { status: 502 }
+            );
+        }
+
+        if (looksLikeHtml(responseText)) {
+            logger.error('[Upload] Backend returned HTML instead of JSON', {
+                requestId,
+                userId,
+                status: backendResponse.status,
+                responsePreview: responseText.slice(0, 200),
+            });
+            return NextResponse.json(
+                {
+                    success: false,
+                    error:
+                        'Parsing service misconfigured: received HTML instead of JSON. On Vercel, set BACKEND_URL to your Railway public URL (https://<service>.up.railway.app/api/py), not localhost and not the Vercel frontend domain.',
+                    details: {
+                        errorType: 'HTML_RESPONSE',
+                        status: backendResponse.status,
+                        responsePreview: responseText.slice(0, 200),
+                    },
+                    requestId,
+                },
+                { status: 502 }
+            );
+        }
+
+        try {
+            backendData = JSON.parse(responseText) as Record<string, unknown>;
+        } catch (parseError) {
             logger.error('[Upload] Failed to parse backend response', {
                 requestId,
                 userId,

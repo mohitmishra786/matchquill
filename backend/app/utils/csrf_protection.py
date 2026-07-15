@@ -33,9 +33,33 @@ class CSRFProtectionMiddleware(BaseHTTPMiddleware):
         self.exempt_paths = exempt_paths or []
         self.state_changing_methods = {"POST", "PUT", "DELETE", "PATCH"}
     
+    def _is_exempt_path(self, path: str) -> bool:
+        """
+        Match exempt paths without treating a parent prefix as a wildcard.
+
+        Historical bug: exempting `/api/py/` also exempted every API route
+        because `startswith` matches `/api/py/upload/...`.
+        Exact paths and optional trailing slash are allowed; subpaths are not
+        unless the exempt entry itself includes them.
+        """
+        for exempt in self.exempt_paths:
+            if path == exempt or path == exempt.rstrip("/"):
+                return True
+            # Allow intentional prefix only when exempt ends with a non-root segment
+            # marker like `/health` — never treat bare API root as a prefix.
+            if exempt.endswith("/") and exempt.count("/") > 2 and path.startswith(exempt):
+                return True
+        return False
+
     async def dispatch(self, request: Request, call_next):
-        # Skip CSRF check for exempt paths
-        if any(request.url.path.startswith(path) for path in self.exempt_paths):
+        # Skip CSRF check for exempt paths (health only — not the entire API)
+        if self._is_exempt_path(request.url.path):
+            return await call_next(request)
+
+        # Bearer-authenticated service-to-service calls (Next.js → FastAPI,
+        # extension → FastAPI) are not browser cookie CSRF targets.
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer ") and len(auth_header) > 10:
             return await call_next(request)
         
         # Skip CSRF check for safe methods

@@ -31,6 +31,10 @@ export const metadata: Metadata = {
   title: "MatchQuill | Career Resume Compiler",
   description: "Generate tailored resumes and cover letters for job applications with AI assistance",
   keywords: ["resume", "cover letter", "job application", "career", "AI"],
+  icons: {
+    icon: [{ url: "/logo-mark.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/logo-mark.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({
@@ -54,7 +58,8 @@ export default function RootLayout({
           Skip to main content
         </a>
         <GlobalErrorBoundary>
-          <SessionProvider>
+          {/* Avoid refetch storms that slow protected navigations */}
+          <SessionProvider refetchOnWindowFocus={false} refetchInterval={0}>
             <ThemeProvider>
               <LanguageProvider>
                 <ToastProvider>

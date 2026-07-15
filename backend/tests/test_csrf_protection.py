@@ -131,6 +131,16 @@ def test_post_without_csrf_token_fails(client):
     assert "CSRF" in response.json()["detail"]
 
 
+def test_bearer_auth_skips_csrf(client):
+    """Service-to-service Bearer calls must not require CSRF cookies."""
+    response = client.post(
+        "/protected",
+        headers={"Authorization": "Bearer service-token-abc"},
+    )
+    assert response.status_code == 200
+    assert response.json()["message"] == "Protected POST"
+
+
 def test_post_with_header_but_no_cookie_fails(client):
     """Test that POST with CSRF header but no cookie is rejected."""
     response = client.post(
