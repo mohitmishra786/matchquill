@@ -5,12 +5,13 @@
  * Supports Google OAuth and email/password login
  */
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useMemo } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { BrandMark } from '@/components/ui/BrandLogo';
+import { authErrorMessage } from '@/lib/auth-login-messages';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -33,38 +34,65 @@ function revealVariants(delay = 0, reduceMotion = false): Variants {
 }
 
 function LoginForm() {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get('callbackUrl') || '/profile';
+    // Auth.js redirects land on /login?error=Configuration (etc.) — derive, don't sync via effect.
+    const urlErrorCode = searchParams.get('error');
+    const urlError = useMemo(
+        () => (urlErrorCode ? authErrorMessage(urlErrorCode) : ''),
+        [urlErrorCode]
+    );
     const reduceMotion = Boolean(useReducedMotion());
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
+    /** Errors from the current submit attempt; takes precedence over ?error= from the URL. */
+    const [submitError, setSubmitError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const error = submitError || urlError;
 
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
+        setSubmitError('');
         setLoading(true);
 
         try {
             const result = await signIn('credentials', {
-                email,
+                email: email.trim(),
                 password,
                 redirect: false,
+                callbackUrl,
             });
 
+            // Auth.js returns HTTP 200 even when url contains ?error=…
+            // Prefer explicit error; also reject ok:false / missing url.
             if (result?.error) {
-                setError(result.error);
-            } else {
-                router.push(callbackUrl);
+                setSubmitError(authErrorMessage(result.error));
+                setLoading(false);
+                return;
             }
+
+            if (!result?.ok || !result.url) {
+                setSubmitError('Sign-in failed. Please check your email and password.');
+                setLoading(false);
+                return;
+            }
+
+            // Hard navigation so the session cookie is always sent to middleware
+            // (client soft navigations can race the cookie / RSC cache).
+            const dest =
+                result.url.startsWith('http') && !result.url.includes('/api/auth')
+                    ? result.url
+                    : callbackUrl.startsWith('/')
+                      ? callbackUrl
+                      : '/profile';
+            window.location.assign(dest);
         } catch {
-            setError('An error occurred. Please try again.');
-        } finally {
+            setSubmitError('An error occurred. Please try again.');
             setLoading(false);
         }
+        // Keep loading=true on success until full page navigation completes.
     };
 
     const handleGoogleLogin = () => {

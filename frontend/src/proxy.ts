@@ -29,6 +29,45 @@ export function isValidSessionToken(token: string | undefined): boolean {
     return !suspiciousPatterns.some(pattern => pattern.test(token));
 }
 
+/**
+ * Collect Auth.js session cookie value, including chunked tokens
+ * (`__Secure-authjs.session-token.0` + `.1` + …).
+ */
+export function getSessionTokenFromCookies(request: NextRequest): string | undefined {
+    const names = [
+        '__Secure-authjs.session-token',
+        'authjs.session-token',
+        // Legacy next-auth v4 names (older deployments)
+        '__Secure-next-auth.session-token',
+        'next-auth.session-token',
+    ];
+
+    for (const name of names) {
+        const direct = request.cookies.get(name)?.value;
+        if (direct) {
+            return direct;
+        }
+    }
+
+    // Chunked: name.0, name.1, …
+    for (const prefix of names) {
+        const chunks: { index: number; value: string }[] = [];
+        for (const cookie of request.cookies.getAll()) {
+            if (cookie.name === prefix) continue;
+            if (!cookie.name.startsWith(`${prefix}.`)) continue;
+            const suffix = cookie.name.slice(prefix.length + 1);
+            if (!/^\d+$/.test(suffix)) continue;
+            chunks.push({ index: Number(suffix), value: cookie.value });
+        }
+        if (chunks.length > 0) {
+            chunks.sort((a, b) => a.index - b.index);
+            return chunks.map((c) => c.value).join('');
+        }
+    }
+
+    return undefined;
+}
+
 export function validateRequestHeaders(request: NextRequest): boolean {
     const suspiciousHeaders = [
         'x-forwarded-host',
@@ -53,8 +92,8 @@ export function proxy(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid request headers' }, { status: 400 });
     }
 
-    const sessionToken = request.cookies.get('authjs.session-token')?.value ||
-        request.cookies.get('__Secure-authjs.session-token')?.value;
+    // Auth.js may store the session as a single cookie or as chunks (.0, .1, …).
+    const sessionToken = getSessionTokenFromCookies(request);
 
     if (!isValidSessionToken(sessionToken)) {
         const isProtectedPage = protectedPages.some(page => pathname.startsWith(page));

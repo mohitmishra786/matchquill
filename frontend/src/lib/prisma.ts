@@ -14,7 +14,15 @@ const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined;
 };
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Neon requires TLS. Prefer explicit ssl so Node pg does not rely on
+// ambiguous sslmode aliases (require/prefer/verify-ca → verify-full warning).
+const databaseUrl = process.env.DATABASE_URL ?? '';
+const pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: databaseUrl.includes('sslmode=') || databaseUrl.includes('neon.tech')
+        ? { rejectUnauthorized: true }
+        : undefined,
+});
 const adapter = new PrismaPg(pool);
 
 export const prisma =
