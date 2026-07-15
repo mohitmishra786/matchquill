@@ -183,7 +183,9 @@ app.add_middleware(LoggingMiddleware)
 app.add_middleware(SecurityHeadersASGIMiddleware)
 
 # Add CSRF protection middleware
-# Exempt health check and auth-related endpoints
+# Only health/root are path-exempt. Bearer JWT requests are also exempt
+# (see CSRFProtectionMiddleware) so Next.js and the extension work without
+# browser cookies. Cookie-based browser POSTs still require CSRF.
 app.add_middleware(
     CSRFProtectionMiddleware,
     exempt_paths=[

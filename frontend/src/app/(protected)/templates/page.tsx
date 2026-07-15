@@ -113,26 +113,35 @@ export default function TemplatesPage() {
     const { success, error: toastError } = useToast();
     const [selectedTemplate, setSelectedTemplate] = useState('experience-skills-projects');
     const [saving, setSaving] = useState(false);
-    const [loading, setLoading] = useState(true);
+    // Templates are static — render the grid immediately; hydrate selection in background.
+    const [settingsHydrated, setSettingsHydrated] = useState(false);
     const [filterCategory, setFilterCategory] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebouncedValue(searchQuery, 250);
 
     useEffect(() => {
-        // Load current setting
-        setLoading(true);
+        // Only wait on session for auth gate; do not block UI on settings fetch.
+        if (status === 'unauthenticated') {
+            return;
+        }
+        let cancelled = false;
         fetch('/api/profile/settings')
             .then((res) => res.json())
             .then((data) => {
-                if (data.selectedTemplate) {
+                if (!cancelled && data.selectedTemplate) {
                     setSelectedTemplate(data.selectedTemplate);
                 }
             })
             .catch((err) => {
                 logger.error('Failed to load settings', { err });
             })
-            .finally(() => setLoading(false));
-    }, []);
+            .finally(() => {
+                if (!cancelled) setSettingsHydrated(true);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [status]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -166,7 +175,8 @@ export default function TemplatesPage() {
         });
     }, [debouncedSearch, filterCategory]);
 
-    if (status === 'loading' || loading) {
+    // Only show skeleton while NextAuth resolves — not while settings load.
+    if (status === 'loading') {
         return <TemplatesSkeleton />;
     }
 
@@ -179,7 +189,7 @@ export default function TemplatesPage() {
                 <div className="flex justify-end mb-6">
                     <button
                         onClick={handleSave}
-                        disabled={saving}
+                        disabled={saving || !settingsHydrated}
                         className="px-4 py-2.5 sm:px-5 min-h-[44px] font-semibold rounded-xl transition-opacity hover:opacity-90 disabled:opacity-50 text-sm sm:text-base"
                         style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
                     >

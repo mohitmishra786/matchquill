@@ -34,17 +34,21 @@ describe('SSRF Protection', () => {
 
         it('should throw error when BACKEND_URL is not configured', async () => {
             delete process.env.BACKEND_URL;
+            delete process.env.NEXT_PUBLIC_API_URL;
             delete process.env.VERCEL_URL;
+            delete process.env.VERCEL;
+            delete process.env.VERCEL_ENV;
 
             const { getBackendUrl } = await import('@/lib/backend-url');
 
             expect(() => getBackendUrl('/upload/resume')).toThrow(
-                'BACKEND_URL environment variable is not configured'
+                'BACKEND_URL is not configured'
             );
         });
 
         it('should derive backend URL from VERCEL_URL when BACKEND_URL is unset', async () => {
             delete process.env.BACKEND_URL;
+            delete process.env.NEXT_PUBLIC_API_URL;
             process.env.VERCEL_URL = 'matchquill.vercel.app';
             process.env.VERCEL_ENV = 'production';
 
@@ -52,6 +56,26 @@ describe('SSRF Protection', () => {
             const result = getBackendUrl('/upload/resume');
 
             expect(result).toBe('https://matchquill.vercel.app/api/py/upload/resume');
+        });
+
+        it('should use NEXT_PUBLIC_API_URL when BACKEND_URL is unset and URL is public', async () => {
+            delete process.env.BACKEND_URL;
+            process.env.NEXT_PUBLIC_API_URL = 'https://matchquill-backend.up.railway.app/api/py';
+            process.env.VERCEL = '1';
+
+            const { getBackendUrl } = await import('@/lib/backend-url');
+            const result = getBackendUrl('/upload/resume');
+
+            expect(result).toBe('https://matchquill-backend.up.railway.app/api/py/upload/resume');
+        });
+
+        it('should reject localhost BACKEND_URL on Vercel', async () => {
+            process.env.BACKEND_URL = 'http://localhost:8000/api/py';
+            process.env.VERCEL = '1';
+
+            const { getBackendUrl } = await import('@/lib/backend-url');
+
+            expect(() => getBackendUrl('/upload/resume')).toThrow(/localhost on Vercel/);
         });
 
         it('should throw error when BACKEND_URL has invalid format', async () => {

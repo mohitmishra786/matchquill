@@ -8,24 +8,27 @@
 
 import { useSession } from 'next-auth/react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import type { UserProfile, Experience, Project, Skill, Education } from '@/types';
 import { createLogger } from '@/lib/logger';
 import { useToast } from '@/components/ui/ToastProvider';
 import Modal from '@/components/ui/Modal';
 import ProfileSkeleton from '@/components/skeletons/ProfileSkeleton';
-import ExperienceForm from '@/components/forms/ExperienceForm';
-import ProjectForm from '@/components/forms/ProjectForm';
-import SkillForm from '@/components/forms/SkillForm';
-import EducationForm from '@/components/forms/EducationForm';
-import ProfileEditForm from '@/components/forms/ProfileEditForm';
-import CoverLetterSection from '@/components/CoverLetterSection';
-import ResumeUpload from '@/components/ResumeUpload';
-import ShareProfileModal from '@/components/ui/ShareProfileModal';
-import GitHubImportModal from '@/components/GitHubImportModal';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileTabs } from '@/components/profile/ProfileTabs';
 import { ExperienceList, ProjectList, SkillList, EducationList } from '@/components/profile/ProfileLists';
 import { applyOptimisticItemUpdate } from '@/lib/profile-optimistic';
+
+// Heavy form/modal trees are only needed after interaction — keep initial paint light.
+const ExperienceForm = dynamic(() => import('@/components/forms/ExperienceForm'), { ssr: false });
+const ProjectForm = dynamic(() => import('@/components/forms/ProjectForm'), { ssr: false });
+const SkillForm = dynamic(() => import('@/components/forms/SkillForm'), { ssr: false });
+const EducationForm = dynamic(() => import('@/components/forms/EducationForm'), { ssr: false });
+const ProfileEditForm = dynamic(() => import('@/components/forms/ProfileEditForm'), { ssr: false });
+const CoverLetterSection = dynamic(() => import('@/components/CoverLetterSection'), { ssr: false });
+const ResumeUpload = dynamic(() => import('@/components/ResumeUpload'), { ssr: false });
+const ShareProfileModal = dynamic(() => import('@/components/ui/ShareProfileModal'), { ssr: false });
+const GitHubImportModal = dynamic(() => import('@/components/GitHubImportModal'), { ssr: false });
 
 const logger = createLogger({ component: 'ProfilePage' });
 
@@ -84,6 +87,8 @@ export default function ProfilePage() {
         if (status === 'authenticated') {
             logger.info('[ProfilePage] User authenticated, fetching profile');
             fetchProfile();
+        } else if (status === 'unauthenticated') {
+            setLoading(false);
         }
     }, [status, fetchProfile]);
 

@@ -10,7 +10,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
-import { Home } from 'lucide-react';
+import { BrandMark } from '@/components/ui/BrandLogo';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -84,10 +84,9 @@ function LoginForm() {
                     <Link
                         href="/"
                         aria-label="MatchQuill home"
-                        className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5 transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]/40 focus:ring-offset-2 focus:ring-offset-[var(--background)]"
-                        style={{ background: 'var(--primary)' }}
+                        className="inline-flex items-center justify-center mb-5 transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]/40 focus:ring-offset-2 focus:ring-offset-[var(--background)] rounded-2xl"
                     >
-                        <Home size={24} strokeWidth={2} aria-hidden="true" style={{ color: 'var(--primary-foreground)' }} />
+                        <BrandMark size={56} title="MatchQuill" />
                     </Link>
                     <h1
                         className="text-3xl font-bold tracking-[-0.02em]"

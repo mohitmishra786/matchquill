@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { createLogger } from '@/lib/logger';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useSession } from 'next-auth/react';
 import { generateBackendToken } from '@/lib/jwt';
 import { sanitizeRichText, sanitizeText } from '@/lib/sanitization';
+import { BrandMark } from '@/components/ui/BrandLogo';
 
 const logger = createLogger({ component: 'InterviewPrepPage' });
 
@@ -96,7 +96,7 @@ Skills: ${data.skills?.map((s: Skill) => s.name).join(', ')}
             <header className="border-b sticky top-0 z-10" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
                 <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <Image src="/logo.png" alt="MatchQuill" width={32} height={32} className="rounded-lg" />
+                        <BrandMark size={32} title="MatchQuill" className="rounded-lg" />
                         <h1 className="text-xl font-bold" style={{ color: 'var(--foreground)', fontFamily: 'var(--font-display)' }}>AI Interview Prep</h1>
                     </div>
                 </div>
