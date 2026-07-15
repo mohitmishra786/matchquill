@@ -60,12 +60,15 @@ export default function ThreeCanvas({ isDark, reduceMotion = false }: ThreeCanva
   const animate = heroVisible && !reduceMotion;
 
   return (
-    <div className="fixed inset-0 -z-0 pointer-events-none" aria-hidden="true">
+    // Sit above the page solid background but under z-10 content sections.
+    // Using z-[1] (not negative) avoids the canvas painting *behind* the
+    // root background and looking like it was removed.
+    <div className="fixed inset-0 z-[1] pointer-events-none" aria-hidden="true">
       <Canvas
         shadows
-        dpr={[1, 2]}
+        dpr={[1, 1.75]}
         frameloop={animate ? 'always' : 'never'}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
         camera={{ position: [11, 3.5, 13], fov: 42, near: 0.1, far: 60 }}
       >
         <CameraRig />

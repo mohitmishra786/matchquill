@@ -120,25 +120,25 @@ export default function Home() {
   const heroReveal3 = revealVariants(0.24, reduceMotion);
 
   return (
-    <div className="relative min-h-screen overflow-hidden" style={{ background: 'var(--background)' }}>
-      {/* 3D hero layer — fixed, behind all content, purely decorative */}
+    <div className="relative min-h-screen overflow-x-hidden" style={{ background: 'var(--background)' }}>
+      {/* 3D staircase / ribbon — fixed behind content, purely decorative.
+          Still mounted; never removed. Visibility depends on a light scrim
+          (not an opaque wall) so the helix remains visible around the hero. */}
       <ThreeCanvas isDark={isDark} reduceMotion={reduceMotion} />
 
       {/* Hero */}
       <section className="relative z-10 pt-28 pb-24 px-4 sm:pt-36 sm:pb-32">
-        {/* Soft scrim so hero copy stays legible over the ribbon regardless
-            of where its coils happen to be at any given moment. A masked
-            solid panel rather than backdrop-blur — blurring live pixels
-            behind a continuously-animating WebGL canvas would force a
-            re-composite every frame; this is a flat alpha blend instead. */}
+        {/* Soft scrim for legibility — keep opacity moderate so the moving
+            staircase is still visible at the sides and through the mask edge.
+            (Earlier values ~0.95–0.98 made the ribbon look "removed".) */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 w-[min(100%,52rem)] h-[38rem] -z-[1]"
+          className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 w-[min(100%,48rem)] h-[34rem] -z-[1]"
           style={{
             background: 'var(--background)',
-            opacity: isDark ? 0.95 : 0.98,
-            WebkitMaskImage: 'radial-gradient(68% 62% at 50% 46%, black 62%, transparent 100%)',
-            maskImage: 'radial-gradient(68% 62% at 50% 46%, black 62%, transparent 100%)',
+            opacity: isDark ? 0.55 : 0.62,
+            WebkitMaskImage: 'radial-gradient(60% 55% at 50% 42%, black 45%, transparent 100%)',
+            maskImage: 'radial-gradient(60% 55% at 50% 42%, black 45%, transparent 100%)',
           }}
         />
         <div className="max-w-3xl mx-auto text-center px-4">
