@@ -15,11 +15,15 @@ import { getBackendUrl } from '@/lib/backend-url';
 import { MAX_UPLOAD_BYTES } from '@/lib/constants';
 import { Prisma } from '@prisma/client';
 
-/** LLM resume parse can take 30–90s; allow Railway cold start + Groq. */
-export const maxDuration = 120;
+/**
+ * Multi-chunk LLM resume parse can exceed 2 minutes on long PDFs (Railway logs
+ * showed ~117s for a 5-chunk parse). Vercel Pro allows up to 300s; keep headroom
+ * for cold start + DB save after parse.
+ */
+export const maxDuration = 300;
 
-/** Backend fetch timeout (ms). */
-const BACKEND_FETCH_TIMEOUT_MS = 110_000;
+/** Backend fetch timeout (ms) — must stay under maxDuration. */
+const BACKEND_FETCH_TIMEOUT_MS = 280_000;
 
 function looksLikeHtml(body: string): boolean {
     const sample = body.slice(0, 200).trim().toLowerCase();
@@ -232,7 +236,7 @@ export async function POST(request: NextRequest) {
                 {
                     success: false,
                     error: timedOut
-                        ? 'Parsing service timed out. The backend may be cold-starting — try again in a few seconds.'
+                        ? 'Parsing service timed out. Long resumes can take over a minute to parse with AI — wait for Railway to finish and try again, or upload a shorter PDF.'
                         : 'Failed to connect to parsing service. Check that BACKEND_URL points at your live Railway API and that the service is running.',
                     details: {
                         errorType: timedOut ? 'TIMEOUT' : 'CONNECTION_ERROR',

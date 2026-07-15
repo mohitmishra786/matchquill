@@ -41,10 +41,13 @@ except ImportError:
 
 # LLM Configuration
 LLM_MODEL = "llama-3.3-70b-versatile"
-MAX_CHUNK_CHARS = 4000  # Conservative limit (model has 131k context)
+# Larger chunks = fewer sequential/parallel Groq calls (model context is large).
+MAX_CHUNK_CHARS = 6000
 MAX_OUTPUT_TOKENS = 8000
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 1.0  # seconds
+# Cap concurrent chunk extractions to avoid Groq rate limits while cutting wall time.
+MAX_PARALLEL_CHUNK_EXTRACTS = 3
 
 
 # Module-level shared AsyncGroq client (lazy initialization)
@@ -602,25 +605,38 @@ Return ONLY JSON, no markdown or explanation."""
         try:
             # Chunk the text
             chunks = self._chunk_resume_text(text)
+
+            # Process chunks concurrently (bounded) — sequential 5-chunk parses
+            # were taking ~2 minutes and timing out the Vercel proxy.
+            semaphore = asyncio.Semaphore(MAX_PARALLEL_CHUNK_EXTRACTS)
+
+            async def _process_chunk(index: int, chunk: Dict[str, Any]) -> Dict[str, Any]:
+                async with semaphore:
+                    logger.info(
+                        f"[ResumeParser] Processing chunk {index + 1}/{len(chunks)}",
+                        {
+                            "chunk_size": len(chunk["text"]),
+                            "section_hints": chunk["section_hints"],
+                        },
+                    )
+                    return await self._llm_extract_chunk(
+                        chunk["text"],
+                        chunk["section_hints"],
+                        index == 0,
+                    )
+
+            all_results = await asyncio.gather(
+                *[_process_chunk(i, chunk) for i, chunk in enumerate(chunks)]
+            )
             
-            # Process each chunk with LLM
-            all_results = []
-            for i, chunk in enumerate(chunks):
-                logger.info(f"[ResumeParser] Processing chunk {i+1}/{len(chunks)}", {
-                    "chunk_size": len(chunk['text']),
-                    "section_hints": chunk['section_hints'],
-                })
-                
-                result = await self._llm_extract_chunk(chunk['text'], chunk['section_hints'], i == 0)
-                all_results.append(result)
-            
-            # Merge all results
-            merged = self._merge_chunk_results(all_results)
+            # Merge all results (order preserved by gather)
+            merged = self._merge_chunk_results(list(all_results))
             merged["extraction_method"] = "llm"
             merged["chunks_processed"] = len(chunks)
             
             logger.info("[ResumeParser] Resume structuring complete", {
                 "chunks_processed": len(chunks),
+                "parallel_limit": MAX_PARALLEL_CHUNK_EXTRACTS,
                 "experiences": len(merged.get("experiences", [])),
                 "projects": len(merged.get("projects", [])),
                 "skills": len(merged.get("skills", [])),
