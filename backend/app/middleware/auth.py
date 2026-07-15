@@ -65,6 +65,52 @@ def clear_db_auth_cache() -> None:
     _DB_AUTH_CACHE.clear()
 
 
+def _jwt_secrets() -> list[str]:
+    """
+    Secrets to try when verifying service-to-service JWTs.
+
+    Frontend (Next.js) signs with AUTH_SECRET || NEXTAUTH_SECRET.
+    Railway must use the *same* value. We try both so a single platform
+    that only sets one name still works, and temporary dual-set mismatches
+    are easier to diagnose.
+    """
+    settings = get_settings()
+    candidates = [
+        (settings.auth_secret or "").strip(),
+        (settings.nextauth_secret or "").strip(),
+        (settings.effective_secret or "").strip(),
+    ]
+    # Preserve order, drop empties/duplicates
+    seen: set[str] = set()
+    secrets: list[str] = []
+    for s in candidates:
+        if s and s not in seen:
+            seen.add(s)
+            secrets.append(s)
+    return secrets
+
+
+def decode_service_jwt(token: str) -> dict:
+    """
+    Decode a HS256 JWT minted by the Next.js frontend.
+
+    Tries AUTH_SECRET then NEXTAUTH_SECRET (same priority as frontend).
+    """
+    secrets = _jwt_secrets()
+    if not secrets:
+        raise JWTError("No AUTH_SECRET / NEXTAUTH_SECRET configured on backend")
+
+    last_error: Optional[Exception] = None
+    for secret in secrets:
+        try:
+            return jwt.decode(token, secret, algorithms=["HS256"])
+        except JWTError as e:
+            last_error = e
+            continue
+    assert last_error is not None
+    raise last_error
+
+
 async def verify_auth_token_with_db(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> str:
@@ -97,16 +143,10 @@ async def verify_auth_token_with_db(
         )
 
     token = credentials.credentials
-    settings = get_settings()
 
     try:
-        # Decode JWT token
-        # Note: NextAuth uses HS256 by default
-        payload = jwt.decode(
-            token,
-            settings.nextauth_secret,
-            algorithms=["HS256"],
-        )
+        # Decode JWT — must match frontend AUTH_SECRET || NEXTAUTH_SECRET
+        payload = decode_service_jwt(token)
 
         user_id = payload.get("sub")
         if user_id is None:
@@ -171,13 +211,22 @@ async def verify_auth_token_with_db(
             await profile_service.close()
 
     except JWTError as e:
+        err = str(e)
         logger.warning("Auth failed: Invalid JWT", {
-            "error": str(e),
+            "error": err,
             "token_prefix": token[:16],
+            "has_secrets": bool(_jwt_secrets()),
         })
+        detail = f"Invalid token: {err}"
+        if "Signature verification failed" in err:
+            detail = (
+                "Invalid token: Signature verification failed. "
+                "Set the same NEXTAUTH_SECRET (or AUTH_SECRET) on both "
+                "Vercel and Railway — values must match exactly."
+            )
         raise HTTPException(
             status_code=401,
-            detail=f"Invalid token: {str(e)}",
+            detail=detail,
             headers={"WWW-Authenticate": "Bearer"},
         )
     except HTTPException:
@@ -221,16 +270,9 @@ async def verify_auth_token(
         )
 
     token = credentials.credentials
-    settings = get_settings()
 
     try:
-        # Decode JWT token
-        # Note: NextAuth uses HS256 by default
-        payload = jwt.decode(
-            token,
-            settings.nextauth_secret,
-            algorithms=["HS256"],
-        )
+        payload = decode_service_jwt(token)
 
         user_id = payload.get("sub")
         if user_id is None:
@@ -244,13 +286,22 @@ async def verify_auth_token(
         return user_id
 
     except JWTError as e:
+        err = str(e)
         logger.warning("Auth failed: Invalid JWT", {
-            "error": str(e),
+            "error": err,
             "token_prefix": token[:16],
+            "has_secrets": bool(_jwt_secrets()),
         })
+        detail = f"Invalid token: {err}"
+        if "Signature verification failed" in err:
+            detail = (
+                "Invalid token: Signature verification failed. "
+                "Set the same NEXTAUTH_SECRET (or AUTH_SECRET) on both "
+                "Vercel and Railway — values must match exactly."
+            )
         raise HTTPException(
             status_code=401,
-            detail=f"Invalid token: {str(e)}",
+            detail=detail,
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -287,14 +338,8 @@ def get_user_id_from_token(token: str) -> Optional[str]:
     Returns:
         User ID if valid, None otherwise
     """
-    settings = get_settings()
-
     try:
-        payload = jwt.decode(
-            token,
-            settings.nextauth_secret,
-            algorithms=["HS256"],
-        )
+        payload = decode_service_jwt(token)
         return payload.get("sub")
     except JWTError:
         return None
