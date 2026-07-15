@@ -1,7 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { isValidSessionToken } from '@/proxy';
+import { NextRequest } from 'next/server';
+import { isValidSessionToken, getSessionTokenFromCookies } from '@/proxy';
 
 describe('Cookie Security', () => {
+    describe('getSessionTokenFromCookies', () => {
+        it('reads standard secure session cookie', () => {
+            const req = new NextRequest('https://matchquill.vercel.app/profile', {
+                headers: {
+                    cookie: '__Secure-authjs.session-token=abc123def456ghi789',
+                },
+            });
+            expect(getSessionTokenFromCookies(req)).toBe('abc123def456ghi789');
+        });
+
+        it('reassembles chunked session cookies', () => {
+            const req = new NextRequest('https://matchquill.vercel.app/profile', {
+                headers: {
+                    cookie:
+                        '__Secure-authjs.session-token.0=chunkA; __Secure-authjs.session-token.1=chunkB',
+                },
+            });
+            expect(getSessionTokenFromCookies(req)).toBe('chunkAchunkB');
+        });
+    });
+
     describe('isValidSessionToken', () => {
         it('should accept valid session tokens', () => {
             const validTokens = [

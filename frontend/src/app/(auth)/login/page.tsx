@@ -5,12 +5,13 @@
  * Supports Google OAuth and email/password login
  */
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { BrandMark } from '@/components/ui/BrandLogo';
+import { authErrorMessage } from '@/lib/auth-login-messages';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -33,7 +34,6 @@ function revealVariants(delay = 0, reduceMotion = false): Variants {
 }
 
 function LoginForm() {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get('callbackUrl') || '/profile';
     const reduceMotion = Boolean(useReducedMotion());
@@ -43,6 +43,14 @@ function LoginForm() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Surface Auth.js redirects like /login?error=Configuration
+    useEffect(() => {
+        const code = searchParams.get('error');
+        if (code) {
+            setError(authErrorMessage(code));
+        }
+    }, [searchParams]);
+
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -50,21 +58,38 @@ function LoginForm() {
 
         try {
             const result = await signIn('credentials', {
-                email,
+                email: email.trim(),
                 password,
                 redirect: false,
+                callbackUrl,
             });
 
+            // Auth.js returns HTTP 200 even when url contains ?error=…
+            // Prefer explicit error; also reject ok:false / missing url.
             if (result?.error) {
-                setError(result.error);
-            } else {
-                router.push(callbackUrl);
+                setError(authErrorMessage(result.error));
+                return;
             }
+
+            if (!result?.ok || !result.url) {
+                setError('Sign-in failed. Please check your email and password.');
+                return;
+            }
+
+            // Hard navigation so the session cookie is always sent to middleware
+            // (client soft navigations can race the cookie / RSC cache).
+            const dest =
+                result.url.startsWith('http') && !result.url.includes('/api/auth')
+                    ? result.url
+                    : callbackUrl.startsWith('/')
+                      ? callbackUrl
+                      : '/profile';
+            window.location.assign(dest);
         } catch {
             setError('An error occurred. Please try again.');
-        } finally {
             setLoading(false);
         }
+        // Keep loading=true on success until full page navigation completes.
     };
 
     const handleGoogleLogin = () => {
