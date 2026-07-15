@@ -12,6 +12,8 @@ import prisma from './prisma';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
     adapter: PrismaAdapter(prisma),
+    // Trust the deployment host (required on Vercel / behind proxies for v5).
+    trustHost: true,
     session: {
         strategy: 'jwt',
     },
@@ -61,22 +63,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             },
         }),
     ],
-    cookies: {
-        sessionToken: {
-            name: process.env.NODE_ENV === 'production'
-                ? '__Secure-authjs.session-token'
-                : 'authjs.session-token',
-            options: {
-                httpOnly: true,
-                sameSite: 'lax',
-                path: '/',
-                secure: process.env.NODE_ENV === 'production',
-                domain: process.env.NODE_ENV === 'production'
-                    ? process.env.NEXTAUTH_URL?.replace(/https?:\/\//, '') || undefined
-                    : undefined,
-            },
-        },
-    },
+    // NOTE: Do NOT set a custom cookie `domain`. On *.vercel.app (a public
+    // suffix) browsers reject cookies with an explicit Domain attribute, so the
+    // session token was never stored and every protected route bounced back to
+    // /login. NextAuth's default host-only cookies work correctly here.
     callbacks: {
         async jwt({ token, user }) {
             if (user) {

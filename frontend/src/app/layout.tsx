@@ -63,8 +63,10 @@ export default function RootLayout({
             </ThemeProvider>
           </SessionProvider>
         </GlobalErrorBoundary>
-        {/* Only load Vercel Analytics when deployed on Vercel */}
-        {process.env.NEXT_PUBLIC_VERCEL_ENV && <Analytics />}
+        {/* Load Vercel Web Analytics only after it's enabled in the Vercel
+            dashboard. Set NEXT_PUBLIC_ENABLE_ANALYTICS=true once enabled;
+            otherwise the injected script 404s and errors in the console. */}
+        {process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === 'true' && <Analytics />}
       </body>
     </html>
   );
