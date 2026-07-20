@@ -52,7 +52,7 @@
   },
   "devDependencies": {
     "@alloc/quick-lru": "^5.2.0",
-    "@tailwindcss/postcss": "^4.1.18",
+    "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/bcryptjs": "^3.0.0",
@@ -62,7 +62,7 @@
     "@types/sanitize-html": "^2.16.1",
     "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^6.0.3",
-    "autoprefixer": "^10.4.24",
+    "autoprefixer": "^10.5.4",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9.26.0",
     "eslint-config-next": "^16.2.10",
