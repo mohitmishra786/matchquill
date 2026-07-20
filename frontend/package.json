@@ -43,7 +43,7 @@
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "sanitize-html": "^2.17.6",
-    "stripe": "^17.7.0",
+    "stripe": "^22.3.2",
     "swr": "^2.4.0",
     "tailwind-merge": "^3.4.0",
     "three": "^0.185.1",
@@ -64,12 +64,12 @@
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.5.4",
     "babel-plugin-react-compiler": "1.0.0",
-    "eslint": "^9.26.0",
+    "eslint": "^10.7.0",
     "eslint-config-next": "^16.2.10",
     "jsdom": "^29.1.1",
     "postcss": "^8.5.10",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.0.18"
   },
   "overrides": {
