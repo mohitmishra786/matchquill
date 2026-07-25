@@ -10,6 +10,23 @@
 
 import Stripe from 'stripe';
 
+/** Default pinned to the SDK's current API version (item-level current_period_end). */
+const DEFAULT_STRIPE_API_VERSION = '2026-06-24.dahlia' as const;
+
+function resolveStripeApiVersion(): Stripe.LatestApiVersion {
+    const configured = process.env.STRIPE_API_VERSION?.trim();
+    if (!configured) {
+        return DEFAULT_STRIPE_API_VERSION;
+    }
+    // Stripe versions look like YYYY-MM-DD.name (e.g. 2026-06-24.dahlia)
+    if (!/^\d{4}-\d{2}-\d{2}\.[a-z0-9_-]+$/i.test(configured)) {
+        throw new Error(
+            `STRIPE_API_VERSION is invalid (${JSON.stringify(configured)}). Expected format YYYY-MM-DD.name (e.g. ${DEFAULT_STRIPE_API_VERSION}).`
+        );
+    }
+    return configured as Stripe.LatestApiVersion;
+}
+
 let cachedStripe: Stripe | null = null;
 
 export function getStripe(): Stripe {
@@ -23,7 +40,7 @@ export function getStripe(): Stripe {
     }
 
     cachedStripe = new Stripe(secretKey, {
-        apiVersion: '2025-02-24.acacia',
+        apiVersion: resolveStripeApiVersion(),
         appInfo: {
             name: 'MatchQuill',
         },
