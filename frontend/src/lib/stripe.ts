@@ -23,7 +23,7 @@ export function getStripe(): Stripe {
     }
 
     cachedStripe = new Stripe(secretKey, {
-        apiVersion: '2025-02-24.acacia',
+        apiVersion: '2026-06-24.dahlia',
         appInfo: {
             name: 'MatchQuill',
         },

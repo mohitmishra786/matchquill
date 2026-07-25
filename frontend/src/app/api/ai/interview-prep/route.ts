@@ -8,9 +8,14 @@ import { auth } from '@/lib/auth';
 import { createRequestLogger, getOrCreateRequestId, logAuthOperation } from '@/lib/logger';
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-});
+/** Lazy Groq client so `next build` succeeds without GROQ_API_KEY at collect time. */
+function getGroq(): Groq {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+        throw new Error('GROQ_API_KEY is not set. Configure it before using AI routes.');
+    }
+    return new Groq({ apiKey });
+}
 
 interface InterviewQuestion {
     question: string;
@@ -87,7 +92,7 @@ Return ONLY a valid JSON object in this exact format:
 
 Generate exactly 5 questions. Return ONLY the JSON, no markdown formatting.`;
 
-        const response = await groq.chat.completions.create({
+        const response = await getGroq().chat.completions.create({
             model: 'llama-3.3-70b-versatile',
             messages: [
                 {

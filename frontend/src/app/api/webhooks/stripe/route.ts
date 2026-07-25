@@ -54,7 +54,11 @@ async function syncSubscription(subscription: Stripe.Subscription) {
         return;
     }
 
-    const priceId = subscription.items.data[0]?.price?.id ?? null;
+    // Stripe API 2026-06-24+: current_period_end lives on subscription items,
+    // not the top-level Subscription object.
+    const primaryItem = subscription.items.data[0];
+    const priceId = primaryItem?.price?.id ?? null;
+    const periodEnd = primaryItem?.current_period_end ?? null;
     const status = mapStripeStatus(subscription.status);
     const tier = status === 'ACTIVE' ? tierForPriceId(priceId) ?? 'PRO' : 'FREE';
 
@@ -63,9 +67,7 @@ async function syncSubscription(subscription: Stripe.Subscription) {
         subscriptionStatus: status,
         stripeSubscriptionId: subscription.id,
         stripePriceId: priceId,
-        currentPeriodEnd: subscription.current_period_end
-            ? new Date(subscription.current_period_end * 1000)
-            : null,
+        currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
     });
 

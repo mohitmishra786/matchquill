@@ -39,13 +39,16 @@ jobs:
 
     - name: Run Tests
       env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        # Fallback defaults for Dependabot / fork PRs where secrets are unavailable.
+        # Unit tests mock external services and only need valid-shaped env values.
+        DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://ci:ci@localhost:5432/matchquill_test' }}
+        REDIS_URL: ${{ secrets.UPSTASH_REDIS_RES_REDIS_URL || 'redis://localhost:6379' }}
         UPSTASH_REDIS_RES_KV_REST_API_TOKEN: ${{ secrets.UPSTASH_REDIS_RES_KV_REST_API_TOKEN }}
         UPSTASH_REDIS_RES_KV_REST_API_URL: ${{ secrets.UPSTASH_REDIS_RES_KV_REST_API_URL }}
         UPSTASH_REDIS_RES_KV_URL: ${{ secrets.UPSTASH_REDIS_RES_KV_URL }}
         UPSTASH_REDIS_RES_REDIS_URL: ${{ secrets.UPSTASH_REDIS_RES_REDIS_URL }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || 'test-groq-key' }}
+        NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || 'ci-test-secret-not-for-production' }}
         NEXTAUTH_URL: http://localhost:3000
         FRONTEND_URL: http://localhost:3000
         GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
@@ -78,8 +81,8 @@ jobs:
 
     - name: Build
       env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://ci:ci@localhost:5432/matchquill_test' }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || 'test-groq-key' }}
       run: npm run build
 
     - name: Run Tests

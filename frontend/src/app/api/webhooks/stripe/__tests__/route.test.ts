@@ -143,8 +143,14 @@ describe('POST /api/webhooks/stripe', () => {
                     customer: 'cus_123',
                     status: 'active',
                     cancel_at_period_end: false,
-                    current_period_end: 1893456000,
-                    items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+                    items: {
+                        data: [
+                            {
+                                price: { id: 'price_pro_monthly' },
+                                current_period_end: 1893456000,
+                            },
+                        ],
+                    },
                 },
             },
         });
@@ -177,8 +183,14 @@ describe('POST /api/webhooks/stripe', () => {
                     customer: 'cus_123',
                     status: 'past_due',
                     cancel_at_period_end: false,
-                    current_period_end: 1893456000,
-                    items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+                    items: {
+                        data: [
+                            {
+                                price: { id: 'price_pro_monthly' },
+                                current_period_end: 1893456000,
+                            },
+                        ],
+                    },
                 },
             },
         });
@@ -207,7 +219,6 @@ describe('POST /api/webhooks/stripe', () => {
                     customer: 'cus_123',
                     status: 'canceled',
                     cancel_at_period_end: false,
-                    current_period_end: null,
                     items: { data: [] },
                 },
             },
@@ -241,7 +252,6 @@ describe('POST /api/webhooks/stripe', () => {
                     customer: 'cus_unknown',
                     status: 'active',
                     cancel_at_period_end: false,
-                    current_period_end: null,
                     items: { data: [] },
                 },
             },
