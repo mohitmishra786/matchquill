@@ -143,11 +143,12 @@ Generate exactly 5 questions. Return ONLY the JSON, no markdown formatting.`;
             errorMessage: error instanceof Error ? error.message : String(error),
         });
 
+        // Keep provider/config details server-side only (already logged above).
         return NextResponse.json(
             {
                 error: 'Internal server error',
                 requestId,
-                detail: error instanceof Error ? error.message : 'Failed to generate questions',
+                detail: 'AI provider temporarily unavailable',
             },
             { status: 500 }
         );

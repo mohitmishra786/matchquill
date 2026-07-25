@@ -73,6 +73,7 @@
     "vitest": "^4.0.18"
   },
   "overrides": {
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.10",
+    "find-my-way": "9.7.0"
   }
 }

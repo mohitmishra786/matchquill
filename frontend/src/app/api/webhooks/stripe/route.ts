@@ -54,12 +54,31 @@ async function syncSubscription(subscription: Stripe.Subscription) {
         return;
     }
 
-    // Stripe API 2026-06-24+: current_period_end lives on subscription items,
-    // not the top-level Subscription object.
-    const primaryItem = subscription.items.data[0];
+    // Stripe API 2026-06-24+: current_period_end lives on subscription items.
+    // MatchQuill plans are single-item; multi-item payloads are unexpected.
+    const items = subscription.items.data;
+    const status = mapStripeStatus(subscription.status);
+
+    if (items.length > 1) {
+        logger.warn('[StripeWebhook] Expected exactly one subscription item; skipping upsert', {
+            subscriptionId: subscription.id,
+            itemCount: items.length,
+        });
+        return;
+    }
+
+    // Canceled/deleted events may arrive with zero items; allow null price/period.
+    if (items.length === 0 && status !== 'CANCELED') {
+        logger.warn('[StripeWebhook] Missing subscription item for non-canceled subscription; skipping upsert', {
+            subscriptionId: subscription.id,
+            status: subscription.status,
+        });
+        return;
+    }
+
+    const primaryItem = items.length === 1 ? items[0] : null;
     const priceId = primaryItem?.price?.id ?? null;
     const periodEnd = primaryItem?.current_period_end ?? null;
-    const status = mapStripeStatus(subscription.status);
     const tier = status === 'ACTIVE' ? tierForPriceId(priceId) ?? 'PRO' : 'FREE';
 
     await upsertSubscriptionState(owner.userId, {
