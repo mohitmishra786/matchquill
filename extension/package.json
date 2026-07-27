@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "devDependencies": {
-    "jsdom": "^29.1.1"
+    "jsdom": "^30.0.0"
   }
 }
