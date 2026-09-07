@@ -19,5 +19,5 @@
 #  FEATURE_FLAGS=semantic_matching,some_other_flag)
 
 sentence-transformers==5.6.0
-torch==2.13.0
-numpy==2.5.1
+torch==2.14.0
+numpy==2.5.2
